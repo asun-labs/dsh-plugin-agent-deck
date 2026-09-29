@@ -1,0 +1,10 @@
+Agent Deck
+Copyright 2026 asun-labs
+
+The panel behavior and visual organization were adapted from the OpenAgentSeal
+sandbox panel (https://github.com/ASunYC/OpenAgentSeal), licensed under the
+Apache License, Version 2.0. This plugin is a separate DeepSeek Harness
+implementation using React, node-pty, and the DSH client slot API.
+
+The bundled terminal stylesheet is generated from @xterm/xterm/css/xterm.css,
+licensed under the MIT License. The generated bundle retains its license notice.
