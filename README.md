@@ -19,6 +19,20 @@
 
 The plugin includes the `node-pty` native dependency. Its install script must be allowed to run so interactive terminals work. This implementation is developed and tested on Windows; macOS and Linux use the same `node-pty` API but still need platform validation.
 
+## Install
+
+Initialize a DSH profile if needed, then install the npm package:
+
+```powershell
+dsh --profile agent-deck --from-default-profile web --dump-config | Out-Null
+dsh plugin --profile agent-deck add @asun-labs/dsh-plugin-agent-deck
+dsh --profile agent-deck --no-open
+```
+
+`node-pty` needs to run its native install script. If DSH reports that pnpm blocked the `node-pty` build, open the Web plugin page, review the named script, and use **Allow these scripts and retry** for that profile. The permission is recorded in that profile's `allowBuilds` setting.
+
+Agent Deck appears as a small launcher on the right edge of the DSH Web UI. Click it, choose a runtime, and switch between **Grid** and **Tabs** in the panel header.
+
 ## Install from a local checkout
 
 Build this package with Node 22.19+ or 24+:
@@ -36,10 +50,6 @@ dsh plugin --profile agent-deck add <absolute-path-to-dsh-plugin-agent-deck>
 dsh --profile agent-deck --dump-config
 dsh --profile agent-deck --no-open
 ```
-
-When the package is published to npm, use `dsh plugin --profile agent-deck add @asun-labs/dsh-plugin-agent-deck` instead of the local path.
-
-Agent Deck appears as a small launcher on the right edge of the DSH Web UI. Click it, choose a runtime, and switch between **Grid** and **Tabs** in the panel header.
 
 ## Configuration
 
