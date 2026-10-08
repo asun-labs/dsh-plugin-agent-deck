@@ -1,6 +1,6 @@
 {
   "name": "@asun-labs/dsh-plugin-agent-deck",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Codex delegation cards and docked CLI output for DeepSeek Harness",
   "type": "module",
   "main": "lib/index.js",
