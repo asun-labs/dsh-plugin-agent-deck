@@ -35,7 +35,9 @@ it('opens the right panel, starts a runtime, and switches between tabs and grid'
   })
   vi.stubGlobal('fetch', fetcher)
   let Overlay: React.ComponentType | undefined
-  const ctx = { slots: { inject: (_name: string, register: () => void) => { register(); return () => {} },
+  const ctx = { effect: (register: () => () => void) => register(),
+    sidebarRightTabs: { register: () => () => {} }, sidebarRight: { openTab() {} },
+    slots: { inject: (_name: string, register: () => void) => { register(); return () => {} },
     register: (_options: unknown, component: React.ComponentType) => { Overlay = component; return () => {} } } } as unknown as Context
   apply(ctx)
   expect(Overlay).toBeDefined()
@@ -67,3 +69,30 @@ it('opens the right panel, starts a runtime, and switches between tabs and grid'
 })
 
 afterEach(() => vi.unstubAllGlobals())
+
+it('renders a conversation child card that opens the native right sidebar tab', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const group = { callId: 'call-1', sessionId: 'session-1', createdAt: Date.now(), state: 'running', children: [
+    { id: 'child-1', label: 'Explore files', provider: 'codex', model: 'gpt-6.1-sol', state: 'running', startedAt: Date.now(), endedAt: null, exitCode: null },
+  ] }
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json(group)))
+  const components = new Map<string, React.ComponentType<any>>()
+  const openTab = vi.fn()
+  const ctx = { effect: (register: () => () => void) => register(), sidebarRightTabs: { register: () => () => {} },
+    sidebarRight: { openTab }, slots: { inject: (_name: string, register: () => void) => { register(); return () => {} },
+      register: (options: { name: string }, component: React.ComponentType<any>) => { components.set(options.name, component); return () => {} } } } as unknown as Context
+  apply(ctx)
+  expect(components.has('settings.section')).toBe(true)
+  expect(components.has('sidebar.right.pane.tab')).toBe(true)
+  const ToolCard = components.get('tool.call.toolview')!
+  const mount = document.createElement('div')
+  document.body.append(mount)
+  const root = createRoot(mount)
+  await act(async () => { root.render(<ToolCard callId="call-1" block={{}} />) })
+  await act(async () => { await Promise.resolve() })
+  expect(mount.textContent).toContain('Explore files')
+  await act(async () => { (mount.querySelector('.ad-card-children button') as HTMLButtonElement).click() })
+  expect(openTab).toHaveBeenCalledWith('agent-deck')
+  await act(async () => { root.unmount() })
+  mount.remove()
+})

@@ -1,19 +1,29 @@
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { SessionManager, commandExists, isProvider, providerStatuses, workspaceDirectory, type DeckFrame } from './sessions.ts'
+import { RunGroupStore, dataDirectory, validateSettings, type DeckSettings } from './delegation.ts'
 import type {} from '@deepseek-ai/dsh-client-connection'
 
 export const name = 'dsh-agent-deck'
-export const inject = ['connection']
+export const inject = ['connection', 'tools']
 
 export interface Config {
   workspace: string
   maxSessions: number
+  defaultModel: string
+  codexProfile: string
+  codexAccountId: string
+  historyDays: number
 }
 
 export const Config: Schema<Config> = Schema.object({
   workspace: Schema.string().default(''),
   maxSessions: Schema.number().default(9),
+  defaultModel: Schema.string().default(''),
+  codexProfile: Schema.string().default(''),
+  codexAccountId: Schema.string().default(''),
+  historyDays: Schema.number().default(30),
 })
 
 const BASE = '/api/agent-deck'
@@ -79,12 +89,72 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   }
   const manager = new SessionManager(await workspaceDirectory(config.workspace), config.maxSessions)
   ctx.effect(() => () => manager.dispose(), 'dsh-agent-deck: terminal sessions')
+  const groups = new RunGroupStore(dataDirectory(), { ...config, workspace: manager.cwd })
+  await groups.initialize()
+  ctx.effect(() => () => groups.dispose(), 'dsh-agent-deck: delegated Codex processes')
+
+  ctx.tools.register(defineTool({
+    name: 'agent_deck_delegate',
+    description: 'Launch 1 to 9 independent Codex CLI tasks in parallel when the user asks you to delegate work to Codex agents. Each task has a short visible label and full instructions. The tool waits for all tasks, shows a live Agent Deck card in the conversation, and preserves terminal output for later inspection.',
+    parameters: {
+      tasks: { type: 'array', required: true, items: { type: 'object', additionalProperties: false,
+        properties: { label: { type: 'string', required: true }, prompt: { type: 'string', required: true } } } },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+    async execute(args, exec) {
+      if (!exec.agent) throw new Error('Agent Deck delegation requires an active DSH conversation')
+      const agent = exec.agent as typeof exec.agent & { session?: { header?: { cwd?: string } } }
+      const group = await groups.execute(String(exec.callId), String(exec.agent.id), args.tasks, exec.signal, agent.session?.header?.cwd)
+      return [`Agent Deck group: ${group.callId}`, ...group.children.map(child =>
+        `${child.label}: ${child.state} (exit ${child.exitCode ?? 'unknown'})`)].join('\n')
+    },
+  }))
 
   const unregister: Array<() => Promise<void>> = []
   ctx.effect(() => () => Promise.all(unregister.map(dispose => dispose())).then(() => undefined), 'dsh-agent-deck: routes')
   unregister.push(ctx.connection.fetch.register({ path: `${BASE}/status`, methods: ['GET'], requestBody: 'buffered',
     fetch: async () => json({ agentSwitchAvailable: commandExists('agent-switch'),
       workspace: manager.cwd, maxSessions: manager.maxSessions, providers: providerStatuses() }) }))
+  unregister.push(ctx.connection.fetch.register({ path: `${BASE}/settings`, methods: ['GET', 'POST'], requestBody: 'buffered',
+    async fetch(request) {
+      if (request.method === 'GET') return json(groups.getSettings())
+      try {
+        const value = await body(request)
+        const current = groups.getSettings()
+        const settings: DeckSettings = validateSettings({
+          ...current,
+          defaultModel: typeof value.defaultModel === 'string' ? value.defaultModel : current.defaultModel,
+          codexProfile: typeof value.codexProfile === 'string' ? value.codexProfile : current.codexProfile,
+          codexAccountId: typeof value.codexAccountId === 'string' ? value.codexAccountId : current.codexAccountId,
+          historyDays: typeof value.historyDays === 'number' ? value.historyDays : current.historyDays,
+        })
+        return json(await groups.setSettings(settings))
+      } catch (cause) { return error(cause instanceof Error ? cause.message : 'Invalid settings') }
+    } }))
+  unregister.push(ctx.connection.fetch.register({ path: `${BASE}/profiles`, methods: ['GET'], requestBody: 'buffered',
+    async fetch() { return json(await groups.codexProfiles()) } }))
+  unregister.push(ctx.connection.fetch.register({ path: `${BASE}/accounts`, methods: ['GET'], requestBody: 'buffered',
+    async fetch() { return json(await groups.codexAccounts()) } }))
+  unregister.push(ctx.connection.fetch.register({ path: `${BASE}/groups`, methods: ['GET'], requestBody: 'buffered',
+    async fetch(request) {
+      const query = new URL(request.url).searchParams
+      const id = query.get('id')
+      if (id) {
+        const group = await groups.get(id)
+        return group ? json(group) : error('Run group not found', 404)
+      }
+      const session = query.get('session')
+      return json(session ? await groups.list(session) : await groups.listAll())
+    } }))
+  unregister.push(ctx.connection.fetch.register({ path: `${BASE}/group-output`, methods: ['GET'], requestBody: 'buffered',
+    async fetch(request) {
+      const query = new URL(request.url).searchParams
+      const id = query.get('id')
+      const child = query.get('child')
+      if (!id || !child) return error('Missing group or child id')
+      const output = await groups.output(id, child)
+      return output === undefined ? error('Output not found', 404) : json({ output })
+    } }))
   unregister.push(ctx.connection.fetch.register({ path: `${BASE}/sessions`, methods: ['POST'], requestBody: 'buffered',
     async fetch(request) {
       try {

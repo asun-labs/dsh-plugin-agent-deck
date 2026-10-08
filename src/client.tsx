@@ -5,8 +5,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { xtermCss } from './xterm-css.generated.ts'
+import { installExtras } from './client-extras.tsx'
 
-export const inject = ['slots']
+export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs']
 
 type Provider = 'claude' | 'codex' | 'codewhale' | 'deepseek' | 'kimi' | 'opencode'
 type Layout = 'tabs' | 'grid'
@@ -225,6 +226,7 @@ function stateLabel(state: Tab['state'], zh: boolean): string {
 }
 
 export function apply(ctx: Context): void {
+  installExtras(ctx)
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dsh-agent-deck', order: 30 }, DeckOverlay))
 }
 

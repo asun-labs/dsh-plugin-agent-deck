@@ -1,7 +1,7 @@
 {
   "name": "@asun-labs/dsh-plugin-agent-deck",
-  "version": "0.1.0",
-  "description": "A docked multi-agent terminal deck for DeepSeek Harness",
+  "version": "0.2.0",
+  "description": "Codex delegation cards and docked CLI output for DeepSeek Harness",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -30,7 +30,10 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-ui-renderer",
-        "@deepseek-ai/dsh-client-ui-layout"
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-tool",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
       ],
       "platform": "web"
     },
@@ -62,18 +65,26 @@
     "node-pty": "1.2.0-beta.15"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.4",
-    "@deepseek-ai/dsh-client-connection": "^0.1.7-alpha.2",
-    "@deepseek-ai/dsh-client-ui-layout": "^0.1.7-alpha.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.7-alpha.2",
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-client-connection": "^0.1.5-rc.2 || ^0.1.7-alpha.2",
+    "@deepseek-ai/dsh-client-ui-layout": "^0.1.5-rc.2 || ^0.1.7-alpha.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.5-rc.2 || ^0.1.7-alpha.2",
+    "@deepseek-ai/dsh-client-ui-settings": "^0.1.5-rc.2 || ^0.1.7-alpha.2",
+    "@deepseek-ai/dsh-client-ui-tool": "^0.1.5-rc.2 || ^0.1.7-alpha.2",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "^0.1.5-rc.2 || ^0.1.7-alpha.2",
+    "@deepseek-ai/dsh-tools": "^0.1.5-rc.2 || ^0.1.7-alpha.2",
     "@deepseek-ai/schemastery": "^3.18.4",
     "react": "^18.3.1"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.4",
-    "@deepseek-ai/dsh-client-connection": "0.1.7-alpha.2",
-    "@deepseek-ai/dsh-client-ui-layout": "0.1.7-alpha.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.7-alpha.2",
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-client-connection": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-layout": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-tool": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-tools": "0.1.5-rc.2",
     "@deepseek-ai/schemastery": "3.18.4",
     "@types/node": "^22.20.0",
     "@types/react": "^18.3.0",
