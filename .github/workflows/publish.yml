@@ -1,28 +1,38 @@
 name: Publish
 
-# Publishes to npm only when a version tag is pushed, or when a maintainer
-# runs the workflow manually. `pnpm publish` runs `prepublishOnly`, which is
-# `pnpm run check` (build + typecheck + test), so a red build cannot publish.
-# Requires an NPM_TOKEN repository secret.
+# Publishes to npm through Trusted Publishing (OIDC) — no NPM_TOKEN secret.
+# npm CLI mints a short-lived OIDC token from the `id-token: write` permission
+# and the registry verifies it against the package's trusted publisher record
+# configured on npmjs.com for this repository and workflow file.
+#
+# The publish must use the npm CLI: npm's Trusted Publishing covers
+# `npm publish`, `npm stage publish` and `npm dist-tag` only — pnpm's OIDC
+# support targets its own private registry, not registry.npmjs.org.
+#
+# `npm publish` runs `prepublishOnly` (`pnpm run check`), so build, typecheck
+# and tests gate every publish.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
 
+# `id-token: write` is the critical requirement for Trusted Publishing.
 permissions:
   contents: read
-  id-token: write # npm provenance
+  id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          # Release builds must not use a package-manager cache.
+          package-manager-cache: false
 
       - name: Enable corepack
         run: corepack enable
@@ -41,12 +51,19 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Trusted Publishing needs npm CLI 11.5.1+ (Node 22.14+); Node 24 ships one.
+      - name: Report tool versions
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          node --version
+          npm --version
+
       - name: Install dependencies
         if: steps.guard.outputs.skip == 'false'
         run: pnpm install --frozen-lockfile
 
+      # No NODE_AUTH_TOKEN: the CLI prefers OIDC credentials when
+      # `id-token: write` is granted. Provenance is attached automatically.
       - name: Publish to npm
         if: steps.guard.outputs.skip == 'false'
-        run: pnpm publish --no-git-checks --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish
