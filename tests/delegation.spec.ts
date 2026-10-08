@@ -44,7 +44,10 @@ it('runs parallel Codex children and replays their saved terminal output', async
   expect(result.state).toBe('completed')
   expect(result.children.map(child => child.state)).toEqual(['completed', 'completed'])
   expect(prompts.sort()).toEqual(['Say hello', '说你好'].sort())
-  expect(vi.mocked(spawn).mock.calls[0]?.[1]).toContain('agent-switch codex --profile work exec --color always --model gpt-6.1-sol -')
+  // Windows wraps the call in `cmd.exe /d /c "agent-switch codex ..."`, so prepend the
+  // executable to the arguments to rebuild the same command line on either platform.
+  const spawnCall = vi.mocked(spawn).mock.calls[0]
+  expect(`${spawnCall?.[0]} ${(spawnCall?.[1] ?? []).join(' ')}`).toContain('agent-switch codex --profile work exec --color always --model gpt-6.1-sol -')
   expect(vi.mocked(spawn).mock.calls[0]?.[2]?.cwd).toBe(directory)
   expect(vi.mocked(spawn).mock.calls[0]?.[2]?.env?.AGENT_SWITCH_CODEX_AUTH_CHOICE).toBe('saved-account')
   const restored = new RunGroupStore(directory, settings)
