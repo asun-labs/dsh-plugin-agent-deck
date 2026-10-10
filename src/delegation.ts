@@ -226,8 +226,10 @@ export class RunGroupStore {
   }
 
   private async runChild(runtime: ActiveGroup, child: DelegatedChild, prompt: string, settings: DeckSettings, signal: AbortSignal): Promise<void> {
+    // A delegated workspace is whatever the parent session works in, which is often not a
+    // Git repository; without this flag Codex refuses to start outside one.
     const args = ['codex', ...(settings.codexProfile ? ['--profile', settings.codexProfile] : []),
-      'exec', '--color', 'always', ...(settings.defaultModel ? ['--model', settings.defaultModel] : []), '-']
+      'exec', '--skip-git-repo-check', '--color', 'always', ...(settings.defaultModel ? ['--model', settings.defaultModel] : []), '-']
     const executable = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') : 'agent-switch'
     const commandArgs = process.platform === 'win32' ? ['/d', '/c', `agent-switch ${args.join(' ')}`] : args
     let processHandle: ChildProcessWithoutNullStreams
