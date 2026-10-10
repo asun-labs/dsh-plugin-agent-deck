@@ -132,27 +132,15 @@ function TerminalPane({ tab, visible, zh, onState, onFocus }: {
   return <div ref={element} className="agent-deck-terminal" onClick={() => onFocus(tab.key)} />
 }
 
-function DeckOverlay() {
+export function DeckPanel() {
   const zh = document.documentElement.lang.toLowerCase().startsWith('zh')
   const t = (chinese: string, english: string) => zh ? chinese : english
-  const [open, setOpen] = useState(false)
-  const [fullscreen, setFullscreen] = useState(false)
-  const [width, setWidth] = useState(700)
   const [layout, setLayout] = useState<Layout>('tabs')
   const [status, setStatus] = useState<Status | null>(null)
   const [statusError, setStatusError] = useState('')
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeKey, setActiveKey] = useState('')
   const [busy, setBusy] = useState(false)
-
-  const startResize = (event: React.PointerEvent<HTMLButtonElement>) => {
-    event.preventDefault()
-    const move = (next: PointerEvent) => setWidth(Math.round(Math.max(360, Math.min(1200, window.innerWidth - next.clientX))))
-    const stop = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop) }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', stop, { once: true })
-    window.addEventListener('pointercancel', stop, { once: true })
-  }
 
   const refresh = useCallback(async () => {
     setBusy(true)
@@ -170,7 +158,6 @@ function DeckOverlay() {
     const key = globalThis.crypto?.randomUUID?.() || `deck-${Date.now()}-${Math.random().toString(36).slice(2)}`
     setTabs(current => [...current, { key, provider, state: 'starting' }])
     setActiveKey(key)
-    setOpen(true)
   }
   const closeTab = (key: string) => {
     const index = tabs.findIndex(tab => tab.key === key)
@@ -181,17 +168,12 @@ function DeckOverlay() {
 
   return <>
     <style>{xtermCss + deckCss}</style>
-    {!open && <button className="agent-deck-launch" onClick={() => setOpen(true)} title={t('打开 Agent Deck', 'Open Agent Deck')}>⌘ <span>Agent Deck</span></button>}
-    <section className={`agent-deck-drawer ${open ? 'is-open' : ''} ${fullscreen ? 'fullscreen' : ''}`}
-      style={fullscreen ? undefined : { width: Math.min(width, window.innerWidth - 16) }} aria-label="Agent Deck" aria-hidden={!open}>
-      {!fullscreen && <button className="agent-deck-resizer" onPointerDown={startResize} onDoubleClick={() => setWidth(700)} aria-label={t('调整 Agent Deck 宽度', 'Resize Agent Deck')} title={t('拖动调整宽度，双击重置', 'Drag to resize; double-click to reset')}><span /></button>}
+    <section className="agent-deck-panel" aria-label="Agent Deck Panel">
       <header className="agent-deck-header">
-        <div><strong>Agent Deck</strong><small>{status?.workspace || t('多智能体终端', 'Multi-agent terminals')}</small></div>
+        <div><strong>Agent Deck Panel</strong><small>{status?.workspace || t('多智能体终端', 'Multi-agent terminals')}</small></div>
         <div className="agent-deck-header-actions">
           <button onClick={() => setLayout(value => value === 'tabs' ? 'grid' : 'tabs')} title={t('切换布局', 'Switch layout')}>{layout === 'tabs' ? t('▦ 网格', '▦ Grid') : t('▤ 页签', '▤ Tabs')}</button>
-          <button onClick={() => setFullscreen(value => !value)} title={fullscreen ? t('退出全屏', 'Exit fullscreen') : t('最大化面板', 'Maximize panel')}>{fullscreen ? '❐' : '□'}</button>
           <button onClick={() => void refresh()} disabled={busy} title={t('刷新运行时', 'Refresh runtimes')}>↻</button>
-          <button onClick={() => setOpen(false)} title={t('隐藏面板', 'Hide panel')}>×</button>
         </div>
       </header>
       <div className="agent-deck-providers">
@@ -210,7 +192,7 @@ function DeckOverlay() {
         <div className={`agent-deck-stack ${layout}`}>
           {tabs.map(tab => <article key={tab.key} className={`agent-deck-card ${layout === 'tabs' && tab.key !== activeKey ? 'hidden' : ''} ${tab.key === activeKey ? 'active' : ''}`}>
             {layout === 'grid' && <header onClick={() => setActiveKey(tab.key)}><strong>{tab.provider}</strong><small>{stateLabel(tab.state, zh)}</small><button aria-label={t(`关闭 ${tab.provider} 终端`, `Close ${tab.provider} terminal`)} onClick={() => closeTab(tab.key)}>×</button></header>}
-            <TerminalPane tab={tab} visible={open && (layout === 'grid' || tab.key === activeKey)} zh={zh} onState={updateTab} onFocus={setActiveKey} />
+            <TerminalPane tab={tab} visible={layout === 'grid' || tab.key === activeKey} zh={zh} onState={updateTab} onFocus={setActiveKey} />
           </article>)}
         </div>
       </> : <div className="agent-deck-empty"><span>⌘</span><strong>{t('选择一个 AI 运行时', 'Choose an AI runtime')}</strong><p>{t('每个运行时都有独立的交互终端，可随时切换页签和网格布局。', 'Each runtime opens in an interactive terminal. Switch between tabs and a grid at any time.')}</p></div>}
@@ -226,20 +208,13 @@ function stateLabel(state: Tab['state'], zh: boolean): string {
 }
 
 export function apply(ctx: Context): void {
-  installExtras(ctx)
-  ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dsh-agent-deck', order: 30 }, DeckOverlay))
+  installExtras(ctx, DeckPanel)
 }
 
 const deckCss = `
-.agent-deck-launch,.agent-deck-drawer{pointer-events:auto;font-family:Inter,system-ui,sans-serif}
-.agent-deck-launch{position:fixed;right:12px;top:45%;z-index:1000;border:1px solid #52617a;border-radius:12px 0 0 12px;background:#101827;color:#e4ebf7;padding:12px 10px;cursor:pointer;box-shadow:0 8px 28px #0004;writing-mode:vertical-rl}
-.agent-deck-launch span{font-size:12px;font-weight:700;letter-spacing:.04em}
-.agent-deck-drawer{position:fixed;right:0;top:0;bottom:0;z-index:1001;min-width:0;display:none;flex-direction:column;background:#101827;color:#e4ebf7;border-left:1px solid #344157;box-shadow:-12px 0 48px #0006}
-.agent-deck-drawer.is-open{display:flex}
-.agent-deck-drawer.fullscreen{left:0;width:100vw;border-left:0}
-.agent-deck-drawer button{color:inherit;cursor:pointer}
-.agent-deck-resizer{position:absolute;left:0;top:0;bottom:0;z-index:2;width:9px;border:0;background:transparent;cursor:col-resize;touch-action:none;display:flex;align-items:center;justify-content:center}.agent-deck-resizer span{width:3px;height:64px;border-radius:9px;background:#52617a}.agent-deck-resizer:hover span{background:#7aa2ff;height:100%}
-.agent-deck-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid #293750}
+.agent-deck-panel{height:100%;min-height:0;display:flex;flex-direction:column;background:#101827;color:#e4ebf7;font-family:Inter,system-ui,sans-serif}
+.agent-deck-panel button{color:inherit;cursor:pointer}
+.agent-deck-header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:11px 14px;border-bottom:1px solid #293750}
 .agent-deck-header>div:first-child{display:flex;flex-direction:column;min-width:0;gap:3px}.agent-deck-header strong{font-size:15px}.agent-deck-header small{font-size:11px;color:#91a0b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .agent-deck-header-actions{display:flex;gap:6px}.agent-deck-header-actions button{border:1px solid #344157;border-radius:8px;background:#1b263a;padding:6px 10px;font-size:12px}
 .agent-deck-providers{display:flex;gap:7px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #293750}
@@ -250,5 +225,5 @@ const deckCss = `
 .agent-deck-card{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#0b1020}.agent-deck-stack.tabs .agent-deck-card{position:absolute;inset:0}.agent-deck-card.hidden{display:none}.agent-deck-stack.grid .agent-deck-card{min-height:240px;border:1px solid #344157;border-radius:10px}.agent-deck-stack.grid .agent-deck-card.active{border-color:#7aa2ff}.agent-deck-card header{display:flex;align-items:center;gap:9px;padding:7px 10px;background:#19263a;font-size:12px}.agent-deck-card header button{margin-left:auto;border:0;background:transparent;font-size:17px}
 .agent-deck-terminal{min-height:0;flex:1;padding:8px}.agent-deck-terminal .xterm{height:100%}.agent-deck-empty{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#91a0b8;text-align:center;padding:24px}.agent-deck-empty span{font-size:34px;color:#7aa2ff}.agent-deck-empty strong{color:#e4ebf7}.agent-deck-empty p{max-width:320px;font-size:12px;line-height:1.5}
 .agent-deck-footer{padding:7px 14px;border-top:1px solid #293750;color:#91a0b8;font-size:10px}
-@media(max-width:720px){.agent-deck-drawer{width:100vw!important;min-width:0}.agent-deck-resizer{display:none}.agent-deck-stack.grid{grid-template-columns:1fr}}
+@media(max-width:720px){.agent-deck-stack.grid{grid-template-columns:1fr}}
 `

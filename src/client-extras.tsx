@@ -11,6 +11,8 @@ import { xtermCss } from './xterm-css.generated.ts'
 const BASE = 'api/agent-deck/'
 const TAB_KIND = 'agent-deck'
 const TAB_ID = '@asun-labs/dsh-plugin-agent-deck'
+const PANEL_KIND = 'agent-deck-panel'
+const PANEL_ID = '@asun-labs/dsh-plugin-agent-deck/panel'
 
 interface Child {
   id: string
@@ -186,7 +188,7 @@ function SettingsPage() {
   </section>
 }
 
-export function installExtras(ctx: Context): void {
+export function installExtras(ctx: Context, panel: React.ComponentType): void {
   let selected: Selection = { callId: '', childId: '' }
   const listeners = new Set<() => void>()
   const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
@@ -206,6 +208,11 @@ export function installExtras(ctx: Context): void {
     guide: [guideEntry],
   }), 'agent-deck: rightbar tab type')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID }, RightbarTab))
+  const panelGuide = { id: 'agent-deck-panel', order: 110, title: () => 'Agent Deck Panel', description: () => '运行时终端：启动并切换 AI CLI 终端' }
+  ctx.effect(() => ctx.sidebarRightTabs.register({ id: PANEL_ID, kind: PANEL_KIND, title: () => 'Agent Deck Panel',
+    guide: [panelGuide],
+  }), 'agent-deck: runtime panel tab type')
+  ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: PANEL_ID }, panel))
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: 'agent_deck_delegate' }, ToolCard))
   ctx.slots.inject('settings.section', () => ctx.slots.register({ name: 'settings.section', id: 'agent-deck', order: 110, label: () => 'Agent Deck' }, SettingsPage))
 }

@@ -22,7 +22,32 @@ vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }))
 
 import { apply } from '../src/client.tsx'
 
-it('opens the right panel, starts a runtime, and switches between tabs and grid', async () => {
+const TAB_ID = '@asun-labs/dsh-plugin-agent-deck'
+const PANEL_ID = '@asun-labs/dsh-plugin-agent-deck/panel'
+
+interface GuideEntry { id: string; order: number; title: () => string; description?: () => string }
+interface TabDefinition { id: string; kind: string; title: () => string; guide?: GuideEntry[] }
+interface SlotOptions { name: string; key?: string }
+
+function harness() {
+  const panes = new Map<string, React.ComponentType>()
+  const components = new Map<string, React.ComponentType<any>>()
+  const definitions: TabDefinition[] = []
+  const openTab = vi.fn()
+  const ctx = { effect: (register: () => () => void) => register(),
+    sidebarRightTabs: { register: (definition: TabDefinition) => { definitions.push(definition); return () => {} } },
+    sidebarRight: { openTab },
+    slots: { inject: (_name: string, register: () => void) => { register(); return () => {} },
+      register: (options: SlotOptions, component: React.ComponentType<any>) => {
+        if (options.name === 'sidebar.right.pane.tab' && options.key) panes.set(options.key, component)
+        else if (components.size < 2 || !options.key) components.set(options.name, component)
+        return () => {}
+      } } } as unknown as Context
+  apply(ctx)
+  return { panes, components, definitions, openTab }
+}
+
+it('opens the runtime panel, starts a runtime, and switches between tabs and grid', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   vi.stubGlobal('EventSource', class { static CLOSED = 2; readyState = 1; onmessage = null; onerror = null; close() {} })
@@ -34,21 +59,20 @@ it('opens the right panel, starts a runtime, and switches between tabs and grid'
     return Response.json({ closed: true })
   })
   vi.stubGlobal('fetch', fetcher)
-  let Overlay: React.ComponentType | undefined
-  const ctx = { effect: (register: () => () => void) => register(),
-    sidebarRightTabs: { register: () => () => {} }, sidebarRight: { openTab() {} },
-    slots: { inject: (_name: string, register: () => void) => { register(); return () => {} },
-    register: (_options: unknown, component: React.ComponentType) => { Overlay = component; return () => {} } } } as unknown as Context
-  apply(ctx)
-  expect(Overlay).toBeDefined()
+  const { panes, definitions } = harness()
+  expect(definitions.map(definition => definition.kind)).toEqual(['agent-deck', 'agent-deck-panel'])
+  expect(definitions.map(definition => definition.title())).toEqual(['Agent Deck', 'Agent Deck Panel'])
+  expect(definitions.map(definition => definition.guide?.[0]?.id)).toEqual(['agent-deck', 'agent-deck-panel'])
+  const Panel = panes.get(PANEL_ID)
+  expect(Panel).toBeDefined()
   const mount = document.createElement('div')
   document.body.append(mount)
   const root = createRoot(mount)
-  await act(async () => { root.render(React.createElement(Overlay!)) })
+  await act(async () => { root.render(React.createElement(Panel!)) })
   await act(async () => { await Promise.resolve() })
-  expect(mount.querySelector('.agent-deck-launch')).toBeTruthy()
-  await act(async () => { (mount.querySelector('.agent-deck-launch') as HTMLButtonElement).click() })
-  expect(mount.querySelector('.agent-deck-drawer.is-open')).toBeTruthy()
+  expect(mount.querySelector('.agent-deck-panel')).toBeTruthy()
+  expect(mount.querySelector('.agent-deck-launch')).toBeNull()
+  expect(mount.querySelector('.agent-deck-drawer')).toBeNull()
   await act(async () => { (mount.querySelector('.agent-deck-providers button') as HTMLButtonElement).click() })
   await act(async () => { (mount.querySelector('.agent-deck-providers button') as HTMLButtonElement).click() })
   await act(async () => { await Promise.resolve() })
@@ -76,14 +100,10 @@ it('renders a conversation child card that opens the native right sidebar tab', 
     { id: 'child-1', label: 'Explore files', provider: 'codex', model: 'gpt-6.1-sol', state: 'running', startedAt: Date.now(), endedAt: null, exitCode: null },
   ] }
   vi.stubGlobal('fetch', vi.fn(async () => Response.json(group)))
-  const components = new Map<string, React.ComponentType<any>>()
-  const openTab = vi.fn()
-  const ctx = { effect: (register: () => () => void) => register(), sidebarRightTabs: { register: () => () => {} },
-    sidebarRight: { openTab }, slots: { inject: (_name: string, register: () => void) => { register(); return () => {} },
-      register: (options: { name: string }, component: React.ComponentType<any>) => { components.set(options.name, component); return () => {} } } } as unknown as Context
-  apply(ctx)
+  const { panes, components, openTab } = harness()
   expect(components.has('settings.section')).toBe(true)
-  expect(components.has('sidebar.right.pane.tab')).toBe(true)
+  expect(panes.has(TAB_ID)).toBe(true)
+  expect(panes.has(PANEL_ID)).toBe(true)
   const ToolCard = components.get('tool.call.toolview')!
   const mount = document.createElement('div')
   document.body.append(mount)
