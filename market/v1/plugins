@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-10-10T00:00:00.000Z",
+  "revision": "1",
+  "items": [
+    {
+      "id": "asun-labs/dsh-plugin-agent-deck",
+      "name": "Agent Deck",
+      "displayName": "Agent Deck",
+      "summary": "在右侧面板中通过 agent-switch 运行多个独立的编程 CLI 交互终端，支持页签与网格布局。",
+      "description": "Adds an Agent Deck Panel tab to the right sidebar with independent interactive agent-switch terminals for coding CLIs, in tab and grid layouts.",
+      "homepage": "https://github.com/asun-labs/dsh-plugin-agent-deck",
+      "latestVersion": "0.2.2",
+      "categories": ["ui"],
+      "keywords": ["agent-deck", "terminal", "agent-switch", "codex", "cli"],
+      "package": { "registry": "npm", "name": "@asun-labs/dsh-plugin-agent-deck" },
+      "repository": { "url": "https://github.com/asun-labs/dsh-plugin-agent-deck" },
+      "publisher": { "name": "asun-labs", "url": "https://github.com/asun-labs" },
+      "updatedAt": "2026-10-10T00:00:00.000Z"
+    }
+  ],
+  "page": { "total": 1 }
+}

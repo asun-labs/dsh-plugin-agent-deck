@@ -1,0 +1,22 @@
+{
+  "manifestVersion": "1.0.0",
+  "providerId": "com.asun-labs.plugins",
+  "name": "Asun Labs Plugin Catalog",
+  "description": "asun-labs 自维护的 DSH 插件目录，提供 npm 安装目标。",
+  "homepage": "https://github.com/asun-labs/dsh-plugin-agent-deck",
+  "attribution": {
+    "name": "asun-labs",
+    "url": "https://github.com/asun-labs"
+  },
+  "transport": {
+    "kind": "https-json",
+    "endpoint": "https://raw.githubusercontent.com/asun-labs/dsh-plugin-agent-deck/main/market/v1/plugins",
+    "method": "GET"
+  },
+  "query": {
+    "supported": [],
+    "defaultLimit": 50,
+    "maxLimit": 50,
+    "sorts": []
+  }
+}
