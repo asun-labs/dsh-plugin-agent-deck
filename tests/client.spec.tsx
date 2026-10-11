@@ -92,6 +92,39 @@ it('opens the runtime panel, starts a runtime, and switches between tabs and gri
   mount.remove()
 })
 
+it('keeps a CLI session alive when the right sidebar unmounts its inactive tab', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.stubGlobal('EventSource', class { static CLOSED = 2; readyState = 1; onmessage = null; onerror = null; close() {} })
+  const fetcher = vi.fn(async (url: string, options?: RequestInit) => {
+    if (url.endsWith('/status')) return Response.json({ agentSwitchAvailable: true, workspace: 'C:\\work', maxSessions: 9,
+      providers: [{ provider: 'codex', label: 'Codex', available: true, status: 'ready', targetCommand: 'codex' }] })
+    if (url.endsWith('/sessions') && options?.method === 'POST') return Response.json({ id: 'retained-session', provider: 'codex', cwd: 'C:\\work', command: 'agent-switch codex', exited: false, exitCode: null })
+    return Response.json({ closed: true })
+  })
+  vi.stubGlobal('fetch', fetcher)
+  const Panel = harness().panes.get(PANEL_ID)!
+  const mount = document.createElement('div')
+  document.body.append(mount)
+  const root = createRoot(mount)
+  await act(async () => { root.render(<Panel />) })
+  await act(async () => { await Promise.resolve() })
+  await act(async () => { (mount.querySelector('.agent-deck-providers button') as HTMLButtonElement).click() })
+  await act(async () => { await Promise.resolve() })
+  expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/sessions'))).toHaveLength(1)
+  await act(async () => { root.unmount() })
+  expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/close'))).toBe(false)
+  const reopened = createRoot(mount)
+  await act(async () => { reopened.render(<Panel />) })
+  await act(async () => { await Promise.resolve() })
+  expect(mount.querySelectorAll('.agent-deck-tabs>div')).toHaveLength(1)
+  expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/sessions'))).toHaveLength(1)
+  await act(async () => { (mount.querySelector('[aria-label="Close codex terminal"]') as HTMLButtonElement).click() })
+  expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/close'))).toBe(true)
+  await act(async () => { reopened.unmount() })
+  mount.remove()
+})
+
 afterEach(() => vi.unstubAllGlobals())
 
 it('renders a conversation child card that opens the native right sidebar tab', async () => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -33,6 +33,32 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 function post<T>(path: string, value: unknown): Promise<T> {
   return request<T>(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(value) })
+}
+
+interface PanelState { tabs: Tab[]; activeKey: string; layout: Layout }
+let panelState: PanelState = { tabs: [], activeKey: '', layout: 'tabs' }
+const panelListeners = new Set<() => void>()
+const pendingSessions = new Map<string, Promise<Session>>()
+function subscribePanel(listener: () => void) { panelListeners.add(listener); return () => { panelListeners.delete(listener) } }
+function getPanelState() { return panelState }
+function updatePanel(update: (current: PanelState) => PanelState): void {
+  panelState = update(panelState)
+  for (const listener of panelListeners) listener()
+}
+function updateTab(key: string, patch: Partial<Tab>): void {
+  updatePanel(current => ({ ...current, tabs: current.tabs.map(tab => tab.key === key ? { ...tab, ...patch } : tab) }))
+}
+function ensureSession(tab: Tab, cols: number, rows: number): Promise<Session> {
+  if (tab.session) return Promise.resolve(tab.session)
+  const pending = pendingSessions.get(tab.key)
+  if (pending) return pending
+  const created = post<Session>('sessions', { provider: tab.provider, cols, rows }).then(async session => {
+    if (panelState.tabs.some(item => item.key === tab.key)) updateTab(tab.key, { session, state: 'running' })
+    else await post('close', { id: session.id })
+    return session
+  }).finally(() => { pendingSessions.delete(tab.key) })
+  pendingSessions.set(tab.key, created)
+  return created
 }
 
 function TerminalPane({ tab, visible, zh, onState, onFocus }: {
@@ -71,13 +97,9 @@ function TerminalPane({ tab, visible, zh, onState, onFocus }: {
     })
     void (async () => {
       try {
-        const session = await post<Session>('sessions', { provider: tab.provider, cols: instance.cols || 100, rows: instance.rows || 30 })
-        if (stopped) {
-          await post('close', { id: session.id })
-          return
-        }
+        const session = await ensureSession(tab, instance.cols || 100, instance.rows || 30)
+        if (stopped || !panelState.tabs.some(item => item.key === key)) return
         sessionId.current = session.id
-        onStateRef.current(key, { session, state: 'running' })
         instance.writeln(`cwd: ${session.cwd}`)
         instance.writeln('')
         events = new EventSource(endpoint(`events?id=${encodeURIComponent(session.id)}`))
@@ -119,7 +141,8 @@ function TerminalPane({ tab, visible, zh, onState, onFocus }: {
       instance.dispose()
       terminal.current = null
       fit.current = null
-      if (sessionId.current) void post('close', { id: sessionId.current }).catch(() => undefined)
+      // The right sidebar unmounts inactive tabs. Keep the Host PTY alive so the
+      // terminal can reconnect and replay output when this pane is selected again.
     }
   }, [tab.key, tab.provider])
 
@@ -135,11 +158,9 @@ function TerminalPane({ tab, visible, zh, onState, onFocus }: {
 export function DeckPanel() {
   const zh = document.documentElement.lang.toLowerCase().startsWith('zh')
   const t = (chinese: string, english: string) => zh ? chinese : english
-  const [layout, setLayout] = useState<Layout>('tabs')
+  const { tabs, activeKey, layout } = useSyncExternalStore(subscribePanel, getPanelState)
   const [status, setStatus] = useState<Status | null>(null)
   const [statusError, setStatusError] = useState('')
-  const [tabs, setTabs] = useState<Tab[]>([])
-  const [activeKey, setActiveKey] = useState('')
   const [busy, setBusy] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -150,20 +171,19 @@ export function DeckPanel() {
   }, [])
   useEffect(() => { void refresh() }, [refresh])
 
-  const updateTab = useCallback((key: string, patch: Partial<Tab>) => {
-    setTabs(current => current.map(tab => tab.key === key ? { ...tab, ...patch } : tab))
-  }, [])
+  const setActiveKey = (key: string) => updatePanel(current => ({ ...current, activeKey: key }))
   const addTab = (provider: Provider) => {
     if (!status?.agentSwitchAvailable || tabs.length >= status.maxSessions) return
     const key = globalThis.crypto?.randomUUID?.() || `deck-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    setTabs(current => [...current, { key, provider, state: 'starting' }])
-    setActiveKey(key)
+    updatePanel(current => ({ ...current, tabs: [...current.tabs, { key, provider, state: 'starting' }], activeKey: key }))
   }
   const closeTab = (key: string) => {
     const index = tabs.findIndex(tab => tab.key === key)
     const remaining = tabs.filter(tab => tab.key !== key)
-    setTabs(remaining)
-    if (activeKey === key) setActiveKey(remaining[Math.min(index, remaining.length - 1)]?.key || '')
+    updatePanel(current => ({ ...current, tabs: remaining,
+      activeKey: current.activeKey === key ? remaining[Math.min(index, remaining.length - 1)]?.key || '' : current.activeKey }))
+    const session = tabs[index]?.session
+    if (session) void post('close', { id: session.id }).catch(() => undefined)
   }
 
   return <>
@@ -172,7 +192,7 @@ export function DeckPanel() {
       <header className="agent-deck-header">
         <div><strong>Agent Deck Panel</strong><small>{status?.workspace || t('多智能体终端', 'Multi-agent terminals')}</small></div>
         <div className="agent-deck-header-actions">
-          <button onClick={() => setLayout(value => value === 'tabs' ? 'grid' : 'tabs')} title={t('切换布局', 'Switch layout')}>{layout === 'tabs' ? t('▦ 网格', '▦ Grid') : t('▤ 页签', '▤ Tabs')}</button>
+          <button onClick={() => updatePanel(current => ({ ...current, layout: current.layout === 'tabs' ? 'grid' : 'tabs' }))} title={t('切换布局', 'Switch layout')}>{layout === 'tabs' ? t('▦ 网格', '▦ Grid') : t('▤ 页签', '▤ Tabs')}</button>
           <button onClick={() => void refresh()} disabled={busy} title={t('刷新运行时', 'Refresh runtimes')}>↻</button>
         </div>
       </header>

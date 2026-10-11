@@ -1,6 +1,6 @@
 # Agent Deck for DeepSeek Harness
 
-`@asun-labs/dsh-plugin-agent-deck` connects Codex child tasks to a DeepSeek Harness conversation. A model-facing tool launches parallel Codex CLI processes through `agent-switch`, renders a live task card in the conversation, and opens their terminal output in the native right sidebar. The original manual multi-CLI terminal drawer remains available.
+`@asun-labs/dsh-plugin-agent-deck` connects Codex child tasks to a DeepSeek Harness conversation. A model-facing tool launches parallel Codex CLI processes through `agent-switch`, renders a live task card in the conversation, and opens their terminal output in the native right sidebar. The manual multi-CLI runtime panel is also available as a native right-sidebar tab.
 
 ## Features
 
@@ -34,7 +34,7 @@ dsh --profile agent-deck --no-open
 
 `node-pty` needs to run its native install script. If DSH reports that pnpm blocked the `node-pty` build, open the Web plugin page, review the named script, and use **Allow these scripts and retry** for that profile. The permission is recorded in that profile's `allowBuilds` setting.
 
-Agent Deck appears as a small launcher on the right edge of the DSH Web UI. Click it, choose a runtime, and switch between **Grid** and **Tabs** in the panel header.
+Open the right sidebar's **Agent Deck Panel** tab, choose a runtime, and switch between **Grid** and **Tabs** in the panel header. Switching to another right-sidebar tab keeps its CLI sessions running; close a terminal explicitly to stop it.
 
 For a conversation card, ask the Seal Harness/DSH assistant to delegate one or more tasks to Codex through the `agent_deck_delegate` tool. The assistant must actually call this tool; merely opening a Codex terminal does not insert a tool card into the conversation. Click a child card to open the corresponding terminal output in the native right sidebar. The right sidebar's guide also opens Agent Deck's recent task groups for history playback.
 
@@ -72,7 +72,7 @@ Manual terminals use the Host plugin's configured working directory. Delegated C
 
 ## Architecture
 
-`src/index.ts` registers the model-facing tool and authenticated Host routes through DSH Connection. `src/delegation.ts` keys each task group by the DSH tool call ID and stores its metadata and terminal output under `$DSH_HOME/agent-deck/`; completed output remains viewable after restart. `src/client-extras.tsx` contributes the settings section, keyed tool card, and native right-sidebar tab. The original `src/client.tsx` manual launcher and `src/sessions.ts` interactive PTYs remain available.
+`src/index.ts` registers the model-facing tool and authenticated Host routes through DSH Connection. `src/delegation.ts` keys each task group by the DSH tool call ID and stores its metadata and terminal output under `$DSH_HOME/agent-deck/`; completed output remains viewable after restart. `src/client-extras.tsx` contributes the settings section, keyed tool card, and native right-sidebar tabs. `src/client.tsx` provides the manual runtime panel and `src/sessions.ts` manages its interactive PTYs.
 
 The shell's output and captured model conversations can contain sensitive material. Agent Switch stores captures in its normal local store; Agent Deck also keeps delegated terminal output locally for history playback. It does not upload logs or add telemetry. A Host restart ends running processes; saved output can be reviewed, but the original PTY process cannot be resumed.
 
