@@ -6,8 +6,8 @@ import * as pty from 'node-pty'
 
 export const providers = ['claude', 'codex', 'codewhale', 'deepseek', 'kimi', 'opencode'] as const
 export type Provider = typeof providers[number]
-export type DeckEvent = { type: 'output'; data: string } | { type: 'exit'; code: number } | { type: 'error'; message: string }
-export interface DeckFrame { id: number; event: DeckEvent }
+export type AgentSwitchEvent = { type: 'output'; data: string } | { type: 'exit'; code: number } | { type: 'error'; message: string }
+export interface AgentSwitchFrame { id: number; event: AgentSwitchEvent }
 
 const providerCommands: Record<Provider, readonly string[]> = {
   claude: ['claude'], codex: ['codex'], codewhale: ['codewhale'],
@@ -56,7 +56,7 @@ export async function workspaceDirectory(configured: string): Promise<string> {
   return path
 }
 
-export interface DeckSession {
+export interface AgentSwitchSession {
   id: string
   provider: Provider
   cwd: string
@@ -65,12 +65,12 @@ export interface DeckSession {
   exitCode: number | null
 }
 
-interface ManagedSession extends DeckSession {
+interface ManagedSession extends AgentSwitchSession {
   terminal: pty.IPty
-  history: DeckFrame[]
+  history: AgentSwitchFrame[]
   historyChars: number
   sequence: number
-  listeners: Set<(frame: DeckFrame) => void>
+  listeners: Set<(frame: AgentSwitchFrame) => void>
   expiry?: ReturnType<typeof setTimeout>
 }
 
@@ -82,7 +82,7 @@ function dimensions(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-function publicSession(session: ManagedSession): DeckSession {
+function publicSession(session: ManagedSession): AgentSwitchSession {
   return { id: session.id, provider: session.provider, cwd: session.cwd, command: session.command,
     exited: session.exited, exitCode: session.exitCode }
 }
@@ -94,12 +94,12 @@ export class SessionManager {
 
   get size(): number { return this.sessions.size }
 
-  get(id: string): DeckSession | undefined {
+  get(id: string): AgentSwitchSession | undefined {
     const session = this.sessions.get(id)
     return session && publicSession(session)
   }
 
-  create(provider: Provider, cols: number, rows: number): DeckSession {
+  create(provider: Provider, cols: number, rows: number): AgentSwitchSession {
     if (this.sessions.size >= this.maxSessions) throw new Error('Session limit reached')
     if (!commandExists('agent-switch')) throw new Error('agent-switch is not installed')
     const status = providerStatuses(true).find(item => item.provider === provider)
@@ -131,7 +131,7 @@ export class SessionManager {
     return publicSession(session)
   }
 
-  subscribe(id: string, after: number, listener: (frame: DeckFrame) => void): (() => void) | undefined {
+  subscribe(id: string, after: number, listener: (frame: AgentSwitchFrame) => void): (() => void) | undefined {
     const session = this.sessions.get(id)
     if (!session) return undefined
     for (const frame of session.history) if (frame.id > after) listener(frame)
@@ -168,7 +168,7 @@ export class SessionManager {
     for (const id of this.sessions.keys()) this.close(id)
   }
 
-  private emit(session: ManagedSession, event: DeckEvent): void {
+  private emit(session: ManagedSession, event: AgentSwitchEvent): void {
     const frame = { id: ++session.sequence, event }
     session.history.push(frame)
     session.historyChars += event.type === 'output' ? event.data.length : 0

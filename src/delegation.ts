@@ -4,8 +4,9 @@ import { appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promise
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { commandExists, workspaceDirectory } from './sessions.ts'
+import { importPreviousData } from './legacy-data.ts'
 
-export interface DeckSettings {
+export interface AgentSwitchSettings {
   workspace: string
   maxSessions: number
   defaultModel: string
@@ -46,7 +47,7 @@ function snapshot(group: RunGroup): RunGroup {
   return { ...group, children: group.children.map(child => ({ ...child })) }
 }
 
-export function validateSettings(value: DeckSettings): DeckSettings {
+export function validateSettings(value: AgentSwitchSettings): AgentSwitchSettings {
   if (typeof value.workspace !== 'string' || value.workspace.length === 0) throw new Error('workspace must be a directory path')
   if (!Number.isSafeInteger(value.maxSessions) || value.maxSessions < 1 || value.maxSessions > 32) throw new Error('maxSessions must be 1–32')
   if (!Number.isSafeInteger(value.historyDays) || value.historyDays < 1 || value.historyDays > 365) throw new Error('historyDays must be 1–365')
@@ -57,7 +58,7 @@ export function validateSettings(value: DeckSettings): DeckSettings {
 }
 
 export function dataDirectory(): string {
-  return join(process.env.DSH_HOME || join(homedir(), '.dsh'), 'agent-deck')
+  return join(process.env.DSH_HOME || join(homedir(), '.dsh'), 'agent-switch')
 }
 
 interface ActiveGroup {
@@ -70,16 +71,17 @@ interface ActiveGroup {
 export class RunGroupStore {
   private readonly active = new Map<string, ActiveGroup>()
   private readonly recordWrites = new Map<string, Promise<void>>()
-  private settings: DeckSettings
+  private settings: AgentSwitchSettings
 
-  constructor(readonly root: string, initial: DeckSettings) {
+  constructor(readonly root: string, initial: AgentSwitchSettings) {
     this.settings = validateSettings(initial)
   }
 
   async initialize(): Promise<void> {
+    await importPreviousData(this.root)
     await mkdir(this.root, { recursive: true })
     try {
-      const persisted = JSON.parse(await readFile(join(this.root, 'settings.json'), 'utf8')) as DeckSettings
+      const persisted = JSON.parse(await readFile(join(this.root, 'settings.json'), 'utf8')) as AgentSwitchSettings
       this.settings = validateSettings({ ...this.settings, ...persisted,
         workspace: this.settings.workspace, maxSessions: this.settings.maxSessions })
     } catch (error) {
@@ -88,7 +90,7 @@ export class RunGroupStore {
     }
   }
 
-  getSettings(): DeckSettings { return { ...this.settings } }
+  getSettings(): AgentSwitchSettings { return { ...this.settings } }
 
   async codexProfiles(): Promise<string[]> {
     try {
@@ -117,7 +119,7 @@ export class RunGroupStore {
     }
   }
 
-  async setSettings(value: DeckSettings): Promise<DeckSettings> {
+  async setSettings(value: AgentSwitchSettings): Promise<AgentSwitchSettings> {
     const next = validateSettings({ ...value, workspace: this.settings.workspace, maxSessions: this.settings.maxSessions })
     if (next.codexProfile && next.codexAccountId && !(await this.codexAccounts()).some(account => account.id === next.codexAccountId)) {
       throw new Error('Selected Codex account is no longer saved in agent-switch')
@@ -225,7 +227,7 @@ export class RunGroupStore {
     } else child.kill()
   }
 
-  private async runChild(runtime: ActiveGroup, child: DelegatedChild, prompt: string, settings: DeckSettings, signal: AbortSignal): Promise<void> {
+  private async runChild(runtime: ActiveGroup, child: DelegatedChild, prompt: string, settings: AgentSwitchSettings, signal: AbortSignal): Promise<void> {
     // A delegated workspace is whatever the parent session works in, which is often not a
     // Git repository; without this flag Codex refuses to start outside one.
     const args = ['codex', ...(settings.codexProfile ? ['--profile', settings.codexProfile] : []),

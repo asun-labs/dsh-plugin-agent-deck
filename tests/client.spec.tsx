@@ -21,9 +21,10 @@ vi.mock('@xterm/xterm', () => ({
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }))
 
 import { apply } from '../src/client.tsx'
+import { previousIdentity } from '../src/compatibility.ts'
 
-const TAB_ID = '@asun-labs/dsh-plugin-agent-deck'
-const PANEL_ID = '@asun-labs/dsh-plugin-agent-deck/panel'
+const TAB_ID = '@asun-labs/dsh-plugin-agent-switch'
+const PANEL_ID = '@asun-labs/dsh-plugin-agent-switch/panel'
 
 interface GuideEntry { id: string; order: number; title: () => string; description?: () => string }
 interface TabDefinition { id: string; kind: string; title: () => string; guide?: GuideEntry[] }
@@ -32,6 +33,7 @@ interface SlotOptions { name: string; key?: string }
 function harness() {
   const panes = new Map<string, React.ComponentType>()
   const components = new Map<string, React.ComponentType<any>>()
+  const keyedComponents = new Map<string, React.ComponentType<any>>()
   const definitions: TabDefinition[] = []
   const openTab = vi.fn()
   const ctx = { effect: (register: () => () => void) => register(),
@@ -39,12 +41,13 @@ function harness() {
     sidebarRight: { openTab },
     slots: { inject: (_name: string, register: () => void) => { register(); return () => {} },
       register: (options: SlotOptions, component: React.ComponentType<any>) => {
+        if (options.key) keyedComponents.set(`${options.name}:${options.key}`, component)
         if (options.name === 'sidebar.right.pane.tab' && options.key) panes.set(options.key, component)
         else if (components.size < 2 || !options.key) components.set(options.name, component)
         return () => {}
       } } } as unknown as Context
   apply(ctx)
-  return { panes, components, definitions, openTab }
+  return { panes, components, keyedComponents, definitions, openTab }
 }
 
 it('opens the runtime panel, starts a runtime, and switches between tabs and grid', async () => {
@@ -60,9 +63,10 @@ it('opens the runtime panel, starts a runtime, and switches between tabs and gri
   })
   vi.stubGlobal('fetch', fetcher)
   const { panes, definitions } = harness()
-  expect(definitions.map(definition => definition.kind)).toEqual(['agent-deck', 'agent-deck-panel'])
-  expect(definitions.map(definition => definition.title())).toEqual(['Agent Switch', 'Agent Switch Panel'])
-  expect(definitions.map(definition => definition.guide?.[0]?.id)).toEqual(['agent-deck', 'agent-deck-panel'])
+  const publicTabs = definitions.filter(definition => definition.guide?.length)
+  expect(publicTabs.map(definition => definition.kind)).toEqual(['agent-switch', 'agent-switch-panel'])
+  expect(publicTabs.map(definition => definition.title())).toEqual(['Agent Switch', 'Agent Switch Panel'])
+  expect(publicTabs.map(definition => definition.guide?.[0]?.id)).toEqual(['agent-switch', 'agent-switch-panel'])
   const Panel = panes.get(PANEL_ID)
   expect(Panel).toBeDefined()
   const mount = document.createElement('div')
@@ -70,23 +74,23 @@ it('opens the runtime panel, starts a runtime, and switches between tabs and gri
   const root = createRoot(mount)
   await act(async () => { root.render(React.createElement(Panel!)) })
   await act(async () => { await Promise.resolve() })
-  expect(mount.querySelector('.agent-deck-panel')).toBeTruthy()
-  expect(mount.querySelector('.agent-deck-launch')).toBeNull()
-  expect(mount.querySelector('.agent-deck-drawer')).toBeNull()
-  await act(async () => { (mount.querySelector('.agent-deck-providers button') as HTMLButtonElement).click() })
-  await act(async () => { (mount.querySelector('.agent-deck-providers button') as HTMLButtonElement).click() })
+  expect(mount.querySelector('.agent-switch-panel')).toBeTruthy()
+  expect(mount.querySelector('.agent-switch-launch')).toBeNull()
+  expect(mount.querySelector('.agent-switch-drawer')).toBeNull()
+  await act(async () => { (mount.querySelector('.agent-switch-providers button') as HTMLButtonElement).click() })
+  await act(async () => { (mount.querySelector('.agent-switch-providers button') as HTMLButtonElement).click() })
   await act(async () => { await Promise.resolve() })
   expect(created).toBe(2)
-  expect(mount.querySelector('.agent-deck-tabs')).toBeTruthy()
-  expect(mount.querySelectorAll('.agent-deck-tabs>div')).toHaveLength(2)
+  expect(mount.querySelector('.agent-switch-tabs')).toBeTruthy()
+  expect(mount.querySelectorAll('.agent-switch-tabs>div')).toHaveLength(2)
   await act(async () => { (mount.querySelector('[title="Switch layout"]') as HTMLButtonElement).click() })
-  expect(mount.querySelector('.agent-deck-stack.grid')).toBeTruthy()
-  expect(mount.querySelectorAll('.agent-deck-card header')).toHaveLength(2)
+  expect(mount.querySelector('.agent-switch-stack.grid')).toBeTruthy()
+  expect(mount.querySelectorAll('.agent-switch-card header')).toHaveLength(2)
   await act(async () => { (mount.querySelector('[title="Switch layout"]') as HTMLButtonElement).click() })
-  expect(mount.querySelector('.agent-deck-stack.tabs')).toBeTruthy()
+  expect(mount.querySelector('.agent-switch-stack.tabs')).toBeTruthy()
   await act(async () => { (mount.querySelector('[aria-label="Close codex terminal"]') as HTMLButtonElement).click() })
   await act(async () => { (mount.querySelector('[aria-label="Close codex terminal"]') as HTMLButtonElement).click() })
-  expect(mount.querySelector('.agent-deck-tabs')).toBeNull()
+  expect(mount.querySelector('.agent-switch-tabs')).toBeNull()
   expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/close'))).toBe(true)
   await act(async () => { root.unmount() })
   mount.remove()
@@ -109,7 +113,7 @@ it('keeps a CLI session alive when the right sidebar unmounts its inactive tab',
   const root = createRoot(mount)
   await act(async () => { root.render(<Panel />) })
   await act(async () => { await Promise.resolve() })
-  await act(async () => { (mount.querySelector('.agent-deck-providers button') as HTMLButtonElement).click() })
+  await act(async () => { (mount.querySelector('.agent-switch-providers button') as HTMLButtonElement).click() })
   await act(async () => { await Promise.resolve() })
   expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/sessions'))).toHaveLength(1)
   await act(async () => { root.unmount() })
@@ -117,7 +121,7 @@ it('keeps a CLI session alive when the right sidebar unmounts its inactive tab',
   const reopened = createRoot(mount)
   await act(async () => { reopened.render(<Panel />) })
   await act(async () => { await Promise.resolve() })
-  expect(mount.querySelectorAll('.agent-deck-tabs>div')).toHaveLength(1)
+  expect(mount.querySelectorAll('.agent-switch-tabs>div')).toHaveLength(1)
   expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/sessions'))).toHaveLength(1)
   await act(async () => { (mount.querySelector('[aria-label="Close codex terminal"]') as HTMLButtonElement).click() })
   expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/close'))).toBe(true)
@@ -133,10 +137,14 @@ it('renders a conversation child card that opens the native right sidebar tab', 
     { id: 'child-1', label: 'Explore files', provider: 'codex', model: 'gpt-6.1-sol', state: 'running', startedAt: Date.now(), endedAt: null, exitCode: null },
   ] }
   vi.stubGlobal('fetch', vi.fn(async () => Response.json(group)))
-  const { panes, components, openTab } = harness()
+  const { panes, components, keyedComponents, openTab } = harness()
   expect(components.has('settings.section')).toBe(true)
   expect(panes.has(TAB_ID)).toBe(true)
   expect(panes.has(PANEL_ID)).toBe(true)
+  expect(panes.has(previousIdentity.taskTab.id)).toBe(true)
+  expect(panes.has(previousIdentity.terminalTab.id)).toBe(true)
+  expect(keyedComponents.get(`tool.call.toolview:${previousIdentity.tool}`)).toBe(keyedComponents.get('tool.call.toolview:agent_switch_delegate'))
+  expect(keyedComponents.has(`sidebar.right.pane.tab.title:${previousIdentity.taskTab.id}`)).toBe(true)
   const ToolCard = components.get('tool.call.toolview')!
   const mount = document.createElement('div')
   document.body.append(mount)
@@ -145,7 +153,7 @@ it('renders a conversation child card that opens the native right sidebar tab', 
   await act(async () => { await Promise.resolve() })
   expect(mount.textContent).toContain('Explore files')
   await act(async () => { (mount.querySelector('.ad-card-children button') as HTMLButtonElement).click() })
-  expect(openTab).toHaveBeenCalledWith('agent-deck')
+  expect(openTab).toHaveBeenCalledWith('agent-switch')
   await act(async () => { root.unmount() })
   mount.remove()
 })

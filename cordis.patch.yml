@@ -1,5 +1,5 @@
 - insert:
-    - id: dsh-agent-deck
-      name: '@asun-labs/dsh-plugin-agent-deck'
+    - id: dsh-agent-switch
+      name: '@asun-labs/dsh-plugin-agent-switch'
       config:
         maxSessions: 9

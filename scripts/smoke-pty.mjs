@@ -2,8 +2,8 @@ import { spawn } from 'node-pty'
 
 const windows = process.platform === 'win32'
 const checkAgentSwitch = process.argv.includes('--agent-switch')
-const expected = checkAgentSwitch ? 'agent-switch v' : 'Agent Deck PTY smoke'
-const command = checkAgentSwitch ? 'agent-switch --help' : 'echo Agent Deck PTY smoke'
+const expected = checkAgentSwitch ? 'agent-switch v' : 'Agent Switch PTY smoke'
+const command = checkAgentSwitch ? 'agent-switch --help' : 'echo Agent Switch PTY smoke'
 const terminal = spawn(windows ? (process.env.ComSpec || 'cmd.exe') : '/bin/sh',
   windows ? ['/d', '/c', command] : ['-c', command],
   { name: 'xterm-256color', cols: 80, rows: 24, cwd: process.cwd(), env: process.env })

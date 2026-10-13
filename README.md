@@ -1,14 +1,14 @@
 # Agent Switch for DeepSeek Harness
 
-Agent Switch was previously named Agent Deck. Existing installations upgrade through the same npm package, `@asun-labs/dsh-plugin-agent-deck`; the tool name `agent_deck_delegate` and saved session identifiers remain compatible.
+Install the Agent Switch plugin as `@asun-labs/dsh-plugin-agent-switch`. Existing users can follow the [upgrade guide](MIGRATION.md); saved settings and terminal output are imported automatically on first launch.
 
-`@asun-labs/dsh-plugin-agent-deck` connects Codex child tasks to a DeepSeek Harness conversation. A model-facing tool launches parallel Codex CLI processes through `agent-switch`, renders a live task card in the conversation, and opens their terminal output in the native right sidebar. The manual multi-CLI runtime panel is also available as a native right-sidebar tab.
+`@asun-labs/dsh-plugin-agent-switch` connects Codex child tasks to a DeepSeek Harness conversation. A model-facing tool launches parallel Codex CLI processes through `agent-switch`, renders a live task card in the conversation, and opens their terminal output in the native right sidebar. The manual multi-CLI runtime panel is also available as a native right-sidebar tab.
 
 ## Features
 
 - Interactive terminals for Claude Code, Codex, CodeWhale, the DeepSeek compatibility alias, Kimi, and OpenCode
 - Tabs and grid layouts with independent terminal sessions
-- A custom conversation card for `agent_deck_delegate` with one child card per Codex task
+- A custom conversation card for `agent_switch_delegate` with one child card per Codex task
 - A native DSH right-sidebar tab with live output and saved output replay for completed tasks
 - An Agent Switch settings section for the Codex account profile, default model, and history display window
 - Runtime availability and error messages, resize handling, exit status, and session cleanup
@@ -29,16 +29,16 @@ The plugin includes the `node-pty` native dependency. Its install script must be
 Initialize a DSH profile if needed, then install the npm package:
 
 ```powershell
-dsh --profile agent-deck --from-default-profile web --dump-config | Out-Null
-dsh plugin --profile agent-deck add @asun-labs/dsh-plugin-agent-deck
-dsh --profile agent-deck --no-open
+dsh --profile agent-switch --from-default-profile web --dump-config | Out-Null
+dsh plugin --profile agent-switch add @asun-labs/dsh-plugin-agent-switch
+dsh --profile agent-switch --no-open
 ```
 
 `node-pty` needs to run its native install script. If DSH reports that pnpm blocked the `node-pty` build, open the Web plugin page, review the named script, and use **Allow these scripts and retry** for that profile. The permission is recorded in that profile's `allowBuilds` setting.
 
 Open the right sidebar's **Agent Switch Panel** tab, choose a runtime, and switch between **Grid** and **Tabs** in the panel header. Switching to another right-sidebar tab keeps its CLI sessions running; close a terminal explicitly to stop it.
 
-For a conversation card, ask the Seal Harness/DSH assistant to delegate one or more tasks to Codex through the `agent_deck_delegate` tool. The assistant must actually call this tool; merely opening a Codex terminal does not insert a tool card into the conversation. Click a child card to open the corresponding terminal output in the native right sidebar. The right sidebar's guide also opens Agent Switch's recent task groups for history playback.
+To use Agent Switch, ask the Seal Harness/DSH assistant: “Use Agent Switch to delegate these tasks to Codex.” It calls `agent_switch_delegate`, which creates the conversation card. Click a child card to open the corresponding terminal output in the native right sidebar. The right sidebar's guide also opens Agent Switch's recent task groups for history playback.
 
 ## Install from a local checkout
 
@@ -52,10 +52,10 @@ corepack pnpm run check
 Initialize a DSH profile if needed, then install the package by absolute path:
 
 ```powershell
-dsh --profile agent-deck --from-default-profile web --dump-config | Out-Null
-dsh plugin --profile agent-deck add <absolute-path-to-dsh-plugin-agent-deck>
-dsh --profile agent-deck --dump-config
-dsh --profile agent-deck --no-open
+dsh --profile agent-switch --from-default-profile web --dump-config | Out-Null
+dsh plugin --profile agent-switch add <absolute-path-to-dsh-plugin-agent-switch>
+dsh --profile agent-switch --dump-config
+dsh --profile agent-switch --no-open
 ```
 
 ## Configuration
@@ -74,7 +74,7 @@ Manual terminals use the Host plugin's configured working directory. Delegated C
 
 ## Architecture
 
-`src/index.ts` registers the model-facing tool and authenticated Host routes through DSH Connection. `src/delegation.ts` keys each task group by the DSH tool call ID and stores its metadata and terminal output under `$DSH_HOME/agent-deck/`; completed output remains viewable after restart. `src/client-extras.tsx` contributes the settings section, keyed tool card, and native right-sidebar tabs. `src/client.tsx` provides the manual runtime panel and `src/sessions.ts` manages its interactive PTYs.
+`src/index.ts` registers the model-facing tool and authenticated Host routes through DSH Connection. `src/delegation.ts` keys each task group by the DSH tool call ID and stores its metadata and terminal output under `$DSH_HOME/agent-switch/`; completed output remains viewable after restart. `src/client-extras.tsx` contributes the settings section, keyed tool card, and native right-sidebar tabs. `src/client.tsx` provides the manual runtime panel and `src/sessions.ts` manages its interactive PTYs.
 
 The shell's output and captured model conversations can contain sensitive material. The `agent-switch` CLI stores model captures in its normal local store; this plugin also keeps delegated terminal output locally for history playback. It does not upload logs or add telemetry. A Host restart ends running processes; saved output can be reviewed, but the original PTY process cannot be resumed.
 

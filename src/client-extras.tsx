@@ -7,12 +7,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { xtermCss } from './xterm-css.generated.ts'
+import { previousIdentity } from './compatibility.ts'
 
-const BASE = 'api/agent-deck/'
-const TAB_KIND = 'agent-deck'
-const TAB_ID = '@asun-labs/dsh-plugin-agent-deck'
-const PANEL_KIND = 'agent-deck-panel'
-const PANEL_ID = '@asun-labs/dsh-plugin-agent-deck/panel'
+const BASE = 'api/agent-switch/'
+const TAB_KIND = 'agent-switch'
+const TAB_ID = '@asun-labs/dsh-plugin-agent-switch'
+const PANEL_KIND = 'agent-switch-panel'
+const PANEL_ID = '@asun-labs/dsh-plugin-agent-switch/panel'
 
 interface Child {
   id: string
@@ -145,7 +146,7 @@ function RunPanel({ selection, select }: { selection: Selection; select: (callId
   if (!selection.callId) return <section className="ad-panel-history"><style>{panelCss}</style><h3>Agent Switch 最近任务</h3>
     {recent.length ? recent.map(item => <button key={item.callId} onClick={() => select(item.callId, item.children[0]?.id || '')}>
       <b>{item.children.map(child => child.label).join('、')}</b><span>{item.children.length} 个子任务 · {new Date(item.createdAt).toLocaleString()}</span>
-    </button>) : <p>暂无历史任务。让主会话调用 agent_deck_delegate，或点击会话中的子卡片。</p>}
+    </button>) : <p>暂无历史任务。让主会话调用 agent_switch_delegate，或点击会话中的子卡片。</p>}
   </section>
   if (!group) return <div className="ad-panel-empty">正在加载任务组…</div>
   return <section className="ad-panel">
@@ -179,7 +180,7 @@ function SettingsPage() {
   }
   return <section className="ad-settings"><style>{settingsCss}</style><h2>Agent Switch</h2>
     <p>为通过 agent-switch 启动的 Codex 子任务选择账号配置与默认模型。认证信息由 Codex / agent-switch 保存，本页不会显示密钥。</p>
-    <label>Codex 账号配置名称<input list="agent-deck-codex-profiles" value={settings.codexProfile} onChange={event => update({ codexProfile: event.target.value })} placeholder="留空使用当前默认账号" /><datalist id="agent-deck-codex-profiles">{profiles.map(name => <option key={name} value={name} />)}</datalist></label>
+    <label>Codex 账号配置名称<input list="agent-switch-codex-profiles" value={settings.codexProfile} onChange={event => update({ codexProfile: event.target.value })} placeholder="留空使用当前默认账号" /><datalist id="agent-switch-codex-profiles">{profiles.map(name => <option key={name} value={name} />)}</datalist></label>
     <label>已保存的 Codex 账号<select value={settings.codexAccountId} disabled={!settings.codexProfile} onChange={event => update({ codexAccountId: event.target.value })}><option value="">选择账号</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.label}{account.email ? ` · ${account.email}` : ''}</option>)}</select></label>
     <label>默认模型<input value={settings.defaultModel} onChange={event => update({ defaultModel: event.target.value })} placeholder="留空使用 Codex 默认模型" /></label>
     <label>历史显示天数<input type="number" min={1} max={365} value={settings.historyDays} onChange={event => update({ historyDays: Number(event.target.value) })} /></label>
@@ -203,18 +204,30 @@ export function installExtras(ctx: Context, panel: React.ComponentType): void {
     return <Card callId={props.callId} failed={failed} select={select} />
   }
   function RightbarTab() { return <RunPanel selection={useSyncExternalStore(subscribe, getSelection)} select={select} /> }
-  const guideEntry = { id: 'agent-deck', order: 100, title: () => 'Agent Switch', description: () => 'Codex 子任务终端与历史输出' }
+  const guideEntry = { id: 'agent-switch', order: 100, title: () => 'Agent Switch', description: () => 'Codex 子任务终端与历史输出' }
   ctx.effect(() => ctx.sidebarRightTabs.register({ id: TAB_ID, kind: TAB_KIND, title: () => 'Agent Switch',
     guide: [guideEntry],
-  }), 'agent-deck: rightbar tab type')
+  }), 'agent-switch: rightbar tab type')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID }, RightbarTab))
-  const panelGuide = { id: 'agent-deck-panel', order: 110, title: () => 'Agent Switch Panel', description: () => '运行时终端：启动并切换 AI CLI 终端' }
+  const panelGuide = { id: 'agent-switch-panel', order: 110, title: () => 'Agent Switch Panel', description: () => '运行时终端：启动并切换 AI CLI 终端' }
   ctx.effect(() => ctx.sidebarRightTabs.register({ id: PANEL_ID, kind: PANEL_KIND, title: () => 'Agent Switch Panel',
     guide: [panelGuide],
-  }), 'agent-deck: runtime panel tab type')
+  }), 'agent-switch: runtime panel tab type')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: PANEL_ID }, panel))
-  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: 'agent_deck_delegate' }, ToolCard))
-  ctx.slots.inject('settings.section', () => ctx.slots.register({ name: 'settings.section', id: 'agent-deck', order: 110, label: () => 'Agent Switch' }, SettingsPage))
+  const previousTabs = [
+    { ...previousIdentity.taskTab, component: RightbarTab, title: 'Agent Switch' },
+    { ...previousIdentity.terminalTab, component: panel, title: 'Agent Switch Panel' },
+  ]
+  for (const tab of previousTabs) {
+    ctx.effect(() => ctx.sidebarRightTabs.register({ id: tab.id, kind: tab.kind, title: () => tab.title }), 'agent-switch: existing tab records')
+    ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: tab.id }, tab.component))
+  }
+  for (const tab of [{ id: TAB_ID, title: 'Agent Switch' }, { id: PANEL_ID, title: 'Agent Switch Panel' }, ...previousTabs]) {
+    ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({ name: 'sidebar.right.pane.tab.title', key: tab.id }, () => <>{tab.title}</>))
+  }
+  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: 'agent_switch_delegate' }, ToolCard))
+  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: previousIdentity.tool }, ToolCard))
+  ctx.slots.inject('settings.section', () => ctx.slots.register({ name: 'settings.section', id: 'agent-switch', order: 110, label: () => 'Agent Switch' }, SettingsPage))
 }
 
 const cardCss = `.ad-card{background:#1c1c1e;color:#e9e9eb;border-radius:16px;padding:16px;font:12px system-ui;max-width:720px}.ad-card>header{display:flex;justify-content:space-between;color:#bcbcc0}.ad-card small{color:#a9a9af}.ad-card-tree{display:grid;grid-template-columns:180px 28px minmax(0,1fr);align-items:center;margin-top:20px}.ad-card-parent{display:flex;flex-direction:column;background:#29292b;border-radius:13px;padding:16px}.ad-card-line{height:2px;background:#424246}.ad-card-children{display:grid;gap:10px;border-left:2px solid #424246;padding-left:12px}.ad-card-children button{display:flex;align-items:center;gap:10px;text-align:left;background:#28282a;border:1px solid #303034;border-radius:13px;padding:13px;color:inherit;cursor:pointer;min-height:62px}.ad-card-children button:hover{border-color:#8b9ecb}.ad-card-icon{border-radius:50%;background:#38383a;padding:8px}.ad-card-copy{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}.ad-card-copy b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ad-card-time{color:#aaa}.ad-card-loading{color:#aaa;padding:18px}@media(max-width:650px){.ad-card-tree{grid-template-columns:1fr}.ad-card-line{display:none}.ad-card-children{border:0;padding:12px 0 0}}`

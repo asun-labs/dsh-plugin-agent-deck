@@ -1,6 +1,6 @@
 import { defineConfig } from 'tsdown'
 
-const packageName = '@asun-labs/dsh-plugin-agent-deck'
+const packageName = '@asun-labs/dsh-plugin-agent-switch'
 
 export default defineConfig([
   {

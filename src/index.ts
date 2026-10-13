@@ -1,11 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { SessionManager, commandExists, isProvider, providerStatuses, workspaceDirectory, type DeckFrame } from './sessions.ts'
-import { RunGroupStore, dataDirectory, validateSettings, type DeckSettings } from './delegation.ts'
+import { SessionManager, commandExists, isProvider, providerStatuses, workspaceDirectory, type AgentSwitchFrame } from './sessions.ts'
+import { RunGroupStore, dataDirectory, validateSettings, type AgentSwitchSettings } from './delegation.ts'
 import type {} from '@deepseek-ai/dsh-client-connection'
 
-export const name = 'dsh-agent-deck'
+export const name = 'dsh-agent-switch'
 export const inject = ['connection', 'tools']
 
 export interface Config {
@@ -26,7 +26,7 @@ export const Config: Schema<Config> = Schema.object({
   historyDays: Schema.number().default(30),
 })
 
-const BASE = '/api/agent-deck'
+const BASE = '/api/agent-switch'
 
 function json(value: unknown, status = 200): Response {
   return Response.json(value, { status, headers: { 'cache-control': 'no-store' } })
@@ -58,7 +58,7 @@ function eventStream(manager: SessionManager, id: string, signal: AbortSignal, a
     start(controller) {
       const encoder = new TextEncoder()
       let closed = false
-      const send = (frame: DeckFrame) => {
+      const send = (frame: AgentSwitchFrame) => {
         if (!closed) controller.enqueue(encoder.encode(`id: ${frame.id}\ndata: ${JSON.stringify(frame.event)}\n\n`))
       }
       const stop = (closeController: boolean) => {
@@ -88,14 +88,14 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     throw new Error('Agent Switch maxSessions must be an integer from 1 to 32')
   }
   const manager = new SessionManager(await workspaceDirectory(config.workspace), config.maxSessions)
-  ctx.effect(() => () => manager.dispose(), 'dsh-agent-deck: terminal sessions')
+  ctx.effect(() => () => manager.dispose(), 'dsh-agent-switch: terminal sessions')
   const groups = new RunGroupStore(dataDirectory(), { ...config, workspace: manager.cwd })
   await groups.initialize()
-  ctx.effect(() => () => groups.dispose(), 'dsh-agent-deck: delegated Codex processes')
+  ctx.effect(() => () => groups.dispose(), 'dsh-agent-switch: delegated Codex processes')
 
   ctx.tools.register(defineTool({
-    name: 'agent_deck_delegate',
-    description: 'Launch 1 to 9 independent Codex CLI tasks in parallel when the user asks you to delegate work to Codex agents. Each task has a short visible label and full instructions. The tool waits for all tasks, shows a live Agent Switch card in the conversation, and preserves terminal output for later inspection.',
+    name: 'agent_switch_delegate',
+    description: 'Agent Switch is the multi-CLI delegation plugin. Use this tool when the user asks to use Agent Switch or delegate work to Codex agents. Launch independent Codex CLI tasks in parallel, each with a short visible label and full instructions. The tool waits for all tasks, shows a live Agent Switch card in the conversation, and preserves terminal output for later inspection.',
     parameters: {
       tasks: { type: 'array', required: true, items: { type: 'object', additionalProperties: false,
         properties: { label: { type: 'string', required: true }, prompt: { type: 'string', required: true } } } },
@@ -111,7 +111,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   }))
 
   const unregister: Array<() => Promise<void>> = []
-  ctx.effect(() => () => Promise.all(unregister.map(dispose => dispose())).then(() => undefined), 'dsh-agent-deck: routes')
+  ctx.effect(() => () => Promise.all(unregister.map(dispose => dispose())).then(() => undefined), 'dsh-agent-switch: routes')
   unregister.push(ctx.connection.fetch.register({ path: `${BASE}/status`, methods: ['GET'], requestBody: 'buffered',
     fetch: async () => json({ agentSwitchAvailable: commandExists('agent-switch'),
       workspace: manager.cwd, maxSessions: manager.maxSessions, providers: providerStatuses() }) }))
@@ -121,7 +121,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       try {
         const value = await body(request)
         const current = groups.getSettings()
-        const settings: DeckSettings = validateSettings({
+        const settings: AgentSwitchSettings = validateSettings({
           ...current,
           defaultModel: typeof value.defaultModel === 'string' ? value.defaultModel : current.defaultModel,
           codexProfile: typeof value.codexProfile === 'string' ? value.codexProfile : current.codexProfile,

@@ -17,7 +17,7 @@ const directories: string[] = []
 afterEach(async () => { for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }) })
 
 it('runs parallel Codex children and replays their saved terminal output', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'agent-deck-groups-'))
+  const directory = await mkdtemp(join(tmpdir(), 'agent-switch-groups-'))
   directories.push(directory)
   const prompts: string[] = []
   vi.mocked(spawn).mockImplementation(() => {
@@ -59,7 +59,7 @@ it('runs parallel Codex children and replays their saved terminal output', async
 })
 
 it('lists only saved-account metadata and rejects unsafe model options', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'agent-deck-accounts-'))
+  const directory = await mkdtemp(join(tmpdir(), 'agent-switch-accounts-'))
   directories.push(directory)
   const previous = process.env.AGENT_SWITCH_PROFILE_HOME
   const base = join(directory, 'profiles')

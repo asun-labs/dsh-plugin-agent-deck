@@ -17,7 +17,7 @@ interface Session { id: string; provider: Provider; cwd: string; command: string
 interface Tab { key: string; provider: Provider; session?: Session; state: 'starting' | 'running' | 'exited' | 'error' }
 type Event = { type: 'output'; data: string } | { type: 'exit'; code: number } | { type: 'error'; message: string }
 
-const BASE = 'api/agent-deck/'
+const BASE = 'api/agent-switch/'
 
 function endpoint(path: string): string { return new URL(BASE + path, document.baseURI).toString() }
 
@@ -152,10 +152,10 @@ function TerminalPane({ tab, visible, zh, onState, onFocus }: {
     return () => window.cancelAnimationFrame(timer)
   }, [visible])
 
-  return <div ref={element} className="agent-deck-terminal" onClick={() => onFocus(tab.key)} />
+  return <div ref={element} className="agent-switch-terminal" onClick={() => onFocus(tab.key)} />
 }
 
-export function DeckPanel() {
+export function AgentSwitchPanel() {
   const zh = document.documentElement.lang.toLowerCase().startsWith('zh')
   const t = (chinese: string, english: string) => zh ? chinese : english
   const { tabs, activeKey, layout } = useSyncExternalStore(subscribePanel, getPanelState)
@@ -174,7 +174,7 @@ export function DeckPanel() {
   const setActiveKey = (key: string) => updatePanel(current => ({ ...current, activeKey: key }))
   const addTab = (provider: Provider) => {
     if (!status?.agentSwitchAvailable || tabs.length >= status.maxSessions) return
-    const key = globalThis.crypto?.randomUUID?.() || `deck-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const key = globalThis.crypto?.randomUUID?.() || `agent-switch-${Date.now()}-${Math.random().toString(36).slice(2)}`
     updatePanel(current => ({ ...current, tabs: [...current.tabs, { key, provider, state: 'starting' }], activeKey: key }))
   }
   const closeTab = (key: string) => {
@@ -187,36 +187,36 @@ export function DeckPanel() {
   }
 
   return <>
-    <style>{xtermCss + deckCss}</style>
-    <section className="agent-deck-panel" aria-label="Agent Switch Panel">
-      <header className="agent-deck-header">
+    <style>{xtermCss + agentSwitchCss}</style>
+    <section className="agent-switch-panel" aria-label="Agent Switch Panel">
+      <header className="agent-switch-header">
         <div><strong>Agent Switch Panel</strong><small>{status?.workspace || t('多智能体终端', 'Multi-agent terminals')}</small></div>
-        <div className="agent-deck-header-actions">
+        <div className="agent-switch-header-actions">
           <button onClick={() => updatePanel(current => ({ ...current, layout: current.layout === 'tabs' ? 'grid' : 'tabs' }))} title={t('切换布局', 'Switch layout')}>{layout === 'tabs' ? t('▦ 网格', '▦ Grid') : t('▤ 页签', '▤ Tabs')}</button>
           <button onClick={() => void refresh()} disabled={busy} title={t('刷新运行时', 'Refresh runtimes')}>↻</button>
         </div>
       </header>
-      <div className="agent-deck-providers">
+      <div className="agent-switch-providers">
         {(status?.providers || []).map(provider => <button key={provider.provider} disabled={!status?.agentSwitchAvailable || tabs.length >= status.maxSessions}
           className={provider.available ? 'available' : ''} title={`${provider.status === 'ready' ? t('就绪', 'ready') : provider.status === 'target CLI missing' ? t('目标 CLI 未安装', 'target CLI missing') : t('agent-switch 未安装', 'agent-switch missing')} · agent-switch ${provider.provider}`}
           onClick={() => addTab(provider.provider)}><i />{provider.label}</button>)}
       </div>
-      {statusError && <p className="agent-deck-message error">{statusError}</p>}
-      {status && !status.agentSwitchAvailable && <p className="agent-deck-message">{t('未找到 agent-switch。请先安装 agent-switch-skill。', 'Install agent-switch-skill to enable these terminals.')}</p>}
-      {status?.agentSwitchAvailable && status.providers.every(provider => !provider.available) && <p className="agent-deck-message">{t('未找到受支持的 AI CLI。安装后请刷新。', 'No supported AI CLI was found. Install a CLI, then refresh.')}</p>}
+      {statusError && <p className="agent-switch-message error">{statusError}</p>}
+      {status && !status.agentSwitchAvailable && <p className="agent-switch-message">{t('未找到 agent-switch。请先安装 agent-switch-skill。', 'Install agent-switch-skill to enable these terminals.')}</p>}
+      {status?.agentSwitchAvailable && status.providers.every(provider => !provider.available) && <p className="agent-switch-message">{t('未找到受支持的 AI CLI。安装后请刷新。', 'No supported AI CLI was found. Install a CLI, then refresh.')}</p>}
       {tabs.length > 0 ? <>
-        {layout === 'tabs' && <nav className="agent-deck-tabs" aria-label={t('终端页签', 'Terminal tabs')}>{tabs.map(tab => <div key={tab.key} className={activeKey === tab.key ? 'active' : ''}>
+        {layout === 'tabs' && <nav className="agent-switch-tabs" aria-label={t('终端页签', 'Terminal tabs')}>{tabs.map(tab => <div key={tab.key} className={activeKey === tab.key ? 'active' : ''}>
           <button onClick={() => setActiveKey(tab.key)}><span>{tab.provider}</span><small>{stateLabel(tab.state, zh)}</small></button>
           <button aria-label={t(`关闭 ${tab.provider} 终端`, `Close ${tab.provider} terminal`)} onClick={() => closeTab(tab.key)}>×</button>
         </div>)}</nav>}
-        <div className={`agent-deck-stack ${layout}`}>
-          {tabs.map(tab => <article key={tab.key} className={`agent-deck-card ${layout === 'tabs' && tab.key !== activeKey ? 'hidden' : ''} ${tab.key === activeKey ? 'active' : ''}`}>
+        <div className={`agent-switch-stack ${layout}`}>
+          {tabs.map(tab => <article key={tab.key} className={`agent-switch-card ${layout === 'tabs' && tab.key !== activeKey ? 'hidden' : ''} ${tab.key === activeKey ? 'active' : ''}`}>
             {layout === 'grid' && <header onClick={() => setActiveKey(tab.key)}><strong>{tab.provider}</strong><small>{stateLabel(tab.state, zh)}</small><button aria-label={t(`关闭 ${tab.provider} 终端`, `Close ${tab.provider} terminal`)} onClick={() => closeTab(tab.key)}>×</button></header>}
             <TerminalPane tab={tab} visible={layout === 'grid' || tab.key === activeKey} zh={zh} onState={updateTab} onFocus={setActiveKey} />
           </article>)}
         </div>
-      </> : <div className="agent-deck-empty"><span>⌘</span><strong>{t('选择一个 AI 运行时', 'Choose an AI runtime')}</strong><p>{t('每个运行时都有独立的交互终端，可随时切换页签和网格布局。', 'Each runtime opens in an interactive terminal. Switch between tabs and a grid at any time.')}</p></div>}
-      <footer className="agent-deck-footer">{tabs.length}/{status?.maxSessions || 9} {t('个终端 · 本地工作区 · agent-switch 捕获', 'terminals · local workspace · agent-switch capture')}</footer>
+      </> : <div className="agent-switch-empty"><span>⌘</span><strong>{t('选择一个 AI 运行时', 'Choose an AI runtime')}</strong><p>{t('每个运行时都有独立的交互终端，可随时切换页签和网格布局。', 'Each runtime opens in an interactive terminal. Switch between tabs and a grid at any time.')}</p></div>}
+      <footer className="agent-switch-footer">{tabs.length}/{status?.maxSessions || 9} {t('个终端 · 本地工作区 · agent-switch 捕获', 'terminals · local workspace · agent-switch capture')}</footer>
     </section>
   </>
 }
@@ -228,22 +228,22 @@ function stateLabel(state: Tab['state'], zh: boolean): string {
 }
 
 export function apply(ctx: Context): void {
-  installExtras(ctx, DeckPanel)
+  installExtras(ctx, AgentSwitchPanel)
 }
 
-const deckCss = `
-.agent-deck-panel{height:100%;min-height:0;display:flex;flex-direction:column;background:#101827;color:#e4ebf7;font-family:Inter,system-ui,sans-serif}
-.agent-deck-panel button{color:inherit;cursor:pointer}
-.agent-deck-header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:11px 14px;border-bottom:1px solid #293750}
-.agent-deck-header>div:first-child{display:flex;flex-direction:column;min-width:0;gap:3px}.agent-deck-header strong{font-size:15px}.agent-deck-header small{font-size:11px;color:#91a0b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.agent-deck-header-actions{display:flex;gap:6px}.agent-deck-header-actions button{border:1px solid #344157;border-radius:8px;background:#1b263a;padding:6px 10px;font-size:12px}
-.agent-deck-providers{display:flex;gap:7px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #293750}
-.agent-deck-providers button{display:flex;align-items:center;gap:7px;border:1px solid #344157;border-radius:8px;background:#19263a;padding:7px 10px;font-size:12px}.agent-deck-providers button:hover{border-color:#7aa2ff}.agent-deck-providers button:disabled{opacity:.45;cursor:default}.agent-deck-providers i{display:block;width:7px;height:7px;border-radius:50%;background:#a0a8b8}.agent-deck-providers .available i{background:#22c55e}
-.agent-deck-message{margin:8px 14px;padding:9px 11px;border-radius:8px;background:#283248;color:#ffd27a;font-size:12px}.agent-deck-message.error{color:#ff8f8f}
-.agent-deck-tabs{display:flex;gap:6px;overflow:auto;padding:8px;border-bottom:1px solid #293750}.agent-deck-tabs>div{display:flex;align-items:center;white-space:nowrap;border:1px solid #344157;border-radius:8px;background:#19263a}.agent-deck-tabs>div.active{border-color:#7aa2ff;background:#253b65}.agent-deck-tabs button{display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:6px 9px;font-size:12px}.agent-deck-tabs small,.agent-deck-card small{font-size:10px;color:#91a0b8}
-.agent-deck-stack{min-height:0;flex:1;background:#0b1020}.agent-deck-stack.tabs{position:relative}.agent-deck-stack.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px;overflow:auto;padding:9px;align-content:stretch}
-.agent-deck-card{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#0b1020}.agent-deck-stack.tabs .agent-deck-card{position:absolute;inset:0}.agent-deck-card.hidden{display:none}.agent-deck-stack.grid .agent-deck-card{min-height:240px;border:1px solid #344157;border-radius:10px}.agent-deck-stack.grid .agent-deck-card.active{border-color:#7aa2ff}.agent-deck-card header{display:flex;align-items:center;gap:9px;padding:7px 10px;background:#19263a;font-size:12px}.agent-deck-card header button{margin-left:auto;border:0;background:transparent;font-size:17px}
-.agent-deck-terminal{min-height:0;flex:1;padding:8px}.agent-deck-terminal .xterm{height:100%}.agent-deck-empty{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#91a0b8;text-align:center;padding:24px}.agent-deck-empty span{font-size:34px;color:#7aa2ff}.agent-deck-empty strong{color:#e4ebf7}.agent-deck-empty p{max-width:320px;font-size:12px;line-height:1.5}
-.agent-deck-footer{padding:7px 14px;border-top:1px solid #293750;color:#91a0b8;font-size:10px}
-@media(max-width:720px){.agent-deck-stack.grid{grid-template-columns:1fr}}
+const agentSwitchCss = `
+.agent-switch-panel{height:100%;min-height:0;display:flex;flex-direction:column;background:#101827;color:#e4ebf7;font-family:Inter,system-ui,sans-serif}
+.agent-switch-panel button{color:inherit;cursor:pointer}
+.agent-switch-header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:11px 14px;border-bottom:1px solid #293750}
+.agent-switch-header>div:first-child{display:flex;flex-direction:column;min-width:0;gap:3px}.agent-switch-header strong{font-size:15px}.agent-switch-header small{font-size:11px;color:#91a0b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-switch-header-actions{display:flex;gap:6px}.agent-switch-header-actions button{border:1px solid #344157;border-radius:8px;background:#1b263a;padding:6px 10px;font-size:12px}
+.agent-switch-providers{display:flex;gap:7px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #293750}
+.agent-switch-providers button{display:flex;align-items:center;gap:7px;border:1px solid #344157;border-radius:8px;background:#19263a;padding:7px 10px;font-size:12px}.agent-switch-providers button:hover{border-color:#7aa2ff}.agent-switch-providers button:disabled{opacity:.45;cursor:default}.agent-switch-providers i{display:block;width:7px;height:7px;border-radius:50%;background:#a0a8b8}.agent-switch-providers .available i{background:#22c55e}
+.agent-switch-message{margin:8px 14px;padding:9px 11px;border-radius:8px;background:#283248;color:#ffd27a;font-size:12px}.agent-switch-message.error{color:#ff8f8f}
+.agent-switch-tabs{display:flex;gap:6px;overflow:auto;padding:8px;border-bottom:1px solid #293750}.agent-switch-tabs>div{display:flex;align-items:center;white-space:nowrap;border:1px solid #344157;border-radius:8px;background:#19263a}.agent-switch-tabs>div.active{border-color:#7aa2ff;background:#253b65}.agent-switch-tabs button{display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:6px 9px;font-size:12px}.agent-switch-tabs small,.agent-switch-card small{font-size:10px;color:#91a0b8}
+.agent-switch-stack{min-height:0;flex:1;background:#0b1020}.agent-switch-stack.tabs{position:relative}.agent-switch-stack.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px;overflow:auto;padding:9px;align-content:stretch}
+.agent-switch-card{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#0b1020}.agent-switch-stack.tabs .agent-switch-card{position:absolute;inset:0}.agent-switch-card.hidden{display:none}.agent-switch-stack.grid .agent-switch-card{min-height:240px;border:1px solid #344157;border-radius:10px}.agent-switch-stack.grid .agent-switch-card.active{border-color:#7aa2ff}.agent-switch-card header{display:flex;align-items:center;gap:9px;padding:7px 10px;background:#19263a;font-size:12px}.agent-switch-card header button{margin-left:auto;border:0;background:transparent;font-size:17px}
+.agent-switch-terminal{min-height:0;flex:1;padding:8px}.agent-switch-terminal .xterm{height:100%}.agent-switch-empty{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#91a0b8;text-align:center;padding:24px}.agent-switch-empty span{font-size:34px;color:#7aa2ff}.agent-switch-empty strong{color:#e4ebf7}.agent-switch-empty p{max-width:320px;font-size:12px;line-height:1.5}
+.agent-switch-footer{padding:7px 14px;border-top:1px solid #293750;color:#91a0b8;font-size:10px}
+@media(max-width:720px){.agent-switch-stack.grid{grid-template-columns:1fr}}
 `
