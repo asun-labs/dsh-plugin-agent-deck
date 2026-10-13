@@ -52,7 +52,7 @@ export function providerStatuses(hasAgentSwitch = commandExists('agent-switch'))
 
 export async function workspaceDirectory(configured: string): Promise<string> {
   const path = resolve(configured || process.cwd())
-  if (!(await stat(path)).isDirectory()) throw new Error('Agent Deck workspace must be a directory')
+  if (!(await stat(path)).isDirectory()) throw new Error('Agent Switch workspace must be a directory')
   return path
 }
 

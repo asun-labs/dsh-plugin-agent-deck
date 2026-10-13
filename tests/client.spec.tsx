@@ -61,7 +61,7 @@ it('opens the runtime panel, starts a runtime, and switches between tabs and gri
   vi.stubGlobal('fetch', fetcher)
   const { panes, definitions } = harness()
   expect(definitions.map(definition => definition.kind)).toEqual(['agent-deck', 'agent-deck-panel'])
-  expect(definitions.map(definition => definition.title())).toEqual(['Agent Deck', 'Agent Deck Panel'])
+  expect(definitions.map(definition => definition.title())).toEqual(['Agent Switch', 'Agent Switch Panel'])
   expect(definitions.map(definition => definition.guide?.[0]?.id)).toEqual(['agent-deck', 'agent-deck-panel'])
   const Panel = panes.get(PANEL_ID)
   expect(Panel).toBeDefined()

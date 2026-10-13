@@ -181,11 +181,11 @@ export class RunGroupStore {
     if (callId.length === 0 || callId.length > 160) throw new Error('Invalid tool call id')
     if (tasks.length < 1 || tasks.length > settings.maxSessions) throw new Error(`Expected 1–${settings.maxSessions} tasks`)
     if (settings.codexProfile && !settings.codexAccountId) {
-      throw new Error('Select a saved Codex account for this agent-switch profile in Agent Deck settings')
+      throw new Error('Select a saved Codex account for this agent-switch profile in Agent Switch settings')
     }
     const running = [...this.active.values()].reduce((count, item) =>
       count + item.group.children.filter(child => child.state === 'starting' || child.state === 'running').length, 0)
-    if (running + tasks.length > settings.maxSessions) throw new Error('Agent Deck parallel task limit reached')
+    if (running + tasks.length > settings.maxSessions) throw new Error('Agent Switch parallel task limit reached')
     if (!commandExists('agent-switch') || !commandExists('codex')) throw new Error('agent-switch and codex must be installed')
     const children: DelegatedChild[] = tasks.map(task => {
       if (typeof task.label !== 'string' || task.label.trim().length < 1 || task.label.length > 100) throw new Error('Task label must be 1–100 characters')

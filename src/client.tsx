@@ -82,7 +82,7 @@ function TerminalPane({ tab, visible, zh, onState, onFocus }: {
     fit.current = addon
     instance.loadAddon(addon)
     instance.open(target)
-    instance.writeln(`Agent Deck · agent-switch ${tab.provider}`)
+    instance.writeln(`Agent Switch · agent-switch ${tab.provider}`)
     instance.writeln('')
     try { addon.fit() } catch { /* Hidden until the drawer opens. */ }
     let stopped = false
@@ -188,9 +188,9 @@ export function DeckPanel() {
 
   return <>
     <style>{xtermCss + deckCss}</style>
-    <section className="agent-deck-panel" aria-label="Agent Deck Panel">
+    <section className="agent-deck-panel" aria-label="Agent Switch Panel">
       <header className="agent-deck-header">
-        <div><strong>Agent Deck Panel</strong><small>{status?.workspace || t('多智能体终端', 'Multi-agent terminals')}</small></div>
+        <div><strong>Agent Switch Panel</strong><small>{status?.workspace || t('多智能体终端', 'Multi-agent terminals')}</small></div>
         <div className="agent-deck-header-actions">
           <button onClick={() => updatePanel(current => ({ ...current, layout: current.layout === 'tabs' ? 'grid' : 'tabs' }))} title={t('切换布局', 'Switch layout')}>{layout === 'tabs' ? t('▦ 网格', '▦ Grid') : t('▤ 页签', '▤ Tabs')}</button>
           <button onClick={() => void refresh()} disabled={busy} title={t('刷新运行时', 'Refresh runtimes')}>↻</button>

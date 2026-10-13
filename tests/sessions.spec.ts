@@ -39,7 +39,7 @@ function fakeTerminal(): FakeTerminal {
 
 beforeEach(() => vi.clearAllMocks())
 
-describe('Agent Deck sessions', () => {
+describe('Agent Switch sessions', () => {
   it('accepts only fixed providers and reports CLI availability', () => {
     expect(isProvider('codex')).toBe(true)
     expect(isProvider('codex && del C:\\')).toBe(false)

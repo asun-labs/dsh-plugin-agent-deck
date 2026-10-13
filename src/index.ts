@@ -85,7 +85,7 @@ function eventStream(manager: SessionManager, id: string, signal: AbortSignal, a
 
 export async function apply(ctx: Context, config: Config): Promise<void> {
   if (!Number.isSafeInteger(config.maxSessions) || config.maxSessions < 1 || config.maxSessions > 32) {
-    throw new Error('Agent Deck maxSessions must be an integer from 1 to 32')
+    throw new Error('Agent Switch maxSessions must be an integer from 1 to 32')
   }
   const manager = new SessionManager(await workspaceDirectory(config.workspace), config.maxSessions)
   ctx.effect(() => () => manager.dispose(), 'dsh-agent-deck: terminal sessions')
@@ -95,17 +95,17 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 
   ctx.tools.register(defineTool({
     name: 'agent_deck_delegate',
-    description: 'Launch 1 to 9 independent Codex CLI tasks in parallel when the user asks you to delegate work to Codex agents. Each task has a short visible label and full instructions. The tool waits for all tasks, shows a live Agent Deck card in the conversation, and preserves terminal output for later inspection.',
+    description: 'Launch 1 to 9 independent Codex CLI tasks in parallel when the user asks you to delegate work to Codex agents. Each task has a short visible label and full instructions. The tool waits for all tasks, shows a live Agent Switch card in the conversation, and preserves terminal output for later inspection.',
     parameters: {
       tasks: { type: 'array', required: true, items: { type: 'object', additionalProperties: false,
         properties: { label: { type: 'string', required: true }, prompt: { type: 'string', required: true } } } },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
     async execute(args, exec) {
-      if (!exec.agent) throw new Error('Agent Deck delegation requires an active DSH conversation')
+      if (!exec.agent) throw new Error('Agent Switch delegation requires an active DSH conversation')
       const agent = exec.agent as typeof exec.agent & { session?: { header?: { cwd?: string } } }
       const group = await groups.execute(String(exec.callId), String(exec.agent.id), args.tasks, exec.signal, agent.session?.header?.cwd)
-      return [`Agent Deck group: ${group.callId}`, ...group.children.map(child =>
+      return [`Agent Switch group: ${group.callId}`, ...group.children.map(child =>
         `${child.label}: ${child.state} (exit ${child.exitCode ?? 'unknown'})`)].join('\n')
     },
   }))

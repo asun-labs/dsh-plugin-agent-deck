@@ -38,14 +38,14 @@ interface Selection { callId: string; childId: string }
 function url(path: string): string { return new URL(BASE + path, document.baseURI).toString() }
 async function get<T>(path: string): Promise<T> {
   const response = await fetch(url(path), { credentials: 'same-origin' })
-  if (!response.ok) throw new Error(`Agent Deck request failed (${response.status})`)
+  if (!response.ok) throw new Error(`Agent Switch request failed (${response.status})`)
   return await response.json() as T
 }
 async function post<T>(path: string, value: unknown): Promise<T> {
   const response = await fetch(url(path), { method: 'POST', credentials: 'same-origin',
     headers: { 'content-type': 'application/json' }, body: JSON.stringify(value) })
   const data = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error(data.error || `Agent Deck request failed (${response.status})`)
+  if (!response.ok) throw new Error(data.error || `Agent Switch request failed (${response.status})`)
   return data
 }
 
@@ -81,9 +81,9 @@ function Card({ callId, failed, select }: { callId: string; failed: boolean; sel
   const zh = document.documentElement.lang.toLowerCase().startsWith('zh')
   const children = group?.children ?? []
   const completed = children.filter(child => child.state === 'completed').length
-  return <section className="ad-card" aria-label="Agent Deck delegation">
+  return <section className="ad-card" aria-label="Agent Switch delegation">
     <style>{cardCss}</style>
-    <header><span>♧ {zh ? 'Agent Deck 子任务' : 'Agent Deck tasks'}</span><small>{children.length ? `${completed}/${children.length}` : (zh ? '正在启动' : 'Starting')} · {group ? elapsed(group.createdAt, group.state === 'running' ? null : Math.max(...children.map(child => child.endedAt ?? group.createdAt))) : '0s'}</small></header>
+    <header><span>♧ {zh ? 'Agent Switch 子任务' : 'Agent Switch tasks'}</span><small>{children.length ? `${completed}/${children.length}` : (zh ? '正在启动' : 'Starting')} · {group ? elapsed(group.createdAt, group.state === 'running' ? null : Math.max(...children.map(child => child.endedAt ?? group.createdAt))) : '0s'}</small></header>
     <div className="ad-card-tree">
       <div className="ad-card-parent"><b>◎　{zh ? '主 Agent' : 'Main Agent'}</b><small>{zh ? `协调 ${children.length} 个任务` : `Coordinating ${children.length} tasks`}</small></div>
       <div className="ad-card-line" aria-hidden="true" />
@@ -142,7 +142,7 @@ function RunPanel({ selection, select }: { selection: Selection; select: (callId
   const [active, setActive] = useState(selection.childId)
   const [layout, setLayout] = useState<'tabs' | 'grid'>('tabs')
   useEffect(() => setActive(selection.childId), [selection.childId])
-  if (!selection.callId) return <section className="ad-panel-history"><style>{panelCss}</style><h3>Agent Deck 最近任务</h3>
+  if (!selection.callId) return <section className="ad-panel-history"><style>{panelCss}</style><h3>Agent Switch 最近任务</h3>
     {recent.length ? recent.map(item => <button key={item.callId} onClick={() => select(item.callId, item.children[0]?.id || '')}>
       <b>{item.children.map(child => child.label).join('、')}</b><span>{item.children.length} 个子任务 · {new Date(item.createdAt).toLocaleString()}</span>
     </button>) : <p>暂无历史任务。让主会话调用 agent_deck_delegate，或点击会话中的子卡片。</p>}
@@ -150,7 +150,7 @@ function RunPanel({ selection, select }: { selection: Selection; select: (callId
   if (!group) return <div className="ad-panel-empty">正在加载任务组…</div>
   return <section className="ad-panel">
     <style>{xtermCss + panelCss}</style>
-    <header className="ad-panel-header"><b>Agent Deck</b><span>{group.children.length} 个 Codex 子任务</span><button onClick={() => select('', '')}>历史</button><button onClick={() => setLayout(layout === 'tabs' ? 'grid' : 'tabs')}>{layout === 'tabs' ? '网格' : '页签'}</button></header>
+    <header className="ad-panel-header"><b>Agent Switch</b><span>{group.children.length} 个 Codex 子任务</span><button onClick={() => select('', '')}>历史</button><button onClick={() => setLayout(layout === 'tabs' ? 'grid' : 'tabs')}>{layout === 'tabs' ? '网格' : '页签'}</button></header>
     {layout === 'tabs' && <nav className="ad-panel-tabs">{group.children.map(child => <button key={child.id} className={active === child.id ? 'active' : ''} onClick={() => setActive(child.id)}>{child.label} · {childState(child, true)}</button>)}</nav>}
     <div className={`ad-panel-outputs ${layout}`}>{group.children.map(child => <article key={child.id} className={layout === 'tabs' && child.id !== active ? 'hidden' : ''}>
       {layout === 'grid' && <header onClick={() => setActive(child.id)}>{child.label} · {childState(child, true)}</header>}
@@ -169,7 +169,7 @@ function SettingsPage() {
     void get<string[]>('profiles').then(setProfiles).catch(() => undefined)
     void get<CodexAccount[]>('accounts').then(setAccounts).catch(() => undefined)
   }, [])
-  if (!settings) return <p>{notice || '正在读取 Agent Deck 配置…'}</p>
+  if (!settings) return <p>{notice || '正在读取 Agent Switch 配置…'}</p>
   const update = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch })
   const save = () => {
     if (settings.codexProfile && !settings.codexAccountId) { setNotice('使用独立 Codex profile 时，请选择已保存的账号。'); return }
@@ -177,7 +177,7 @@ function SettingsPage() {
     setSettings(next); setNotice('配置已保存，新启动的 Codex 子任务将使用这些设置。')
     }).catch(error => setNotice(String(error)))
   }
-  return <section className="ad-settings"><style>{settingsCss}</style><h2>Agent Deck</h2>
+  return <section className="ad-settings"><style>{settingsCss}</style><h2>Agent Switch</h2>
     <p>为通过 agent-switch 启动的 Codex 子任务选择账号配置与默认模型。认证信息由 Codex / agent-switch 保存，本页不会显示密钥。</p>
     <label>Codex 账号配置名称<input list="agent-deck-codex-profiles" value={settings.codexProfile} onChange={event => update({ codexProfile: event.target.value })} placeholder="留空使用当前默认账号" /><datalist id="agent-deck-codex-profiles">{profiles.map(name => <option key={name} value={name} />)}</datalist></label>
     <label>已保存的 Codex 账号<select value={settings.codexAccountId} disabled={!settings.codexProfile} onChange={event => update({ codexAccountId: event.target.value })}><option value="">选择账号</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.label}{account.email ? ` · ${account.email}` : ''}</option>)}</select></label>
@@ -203,18 +203,18 @@ export function installExtras(ctx: Context, panel: React.ComponentType): void {
     return <Card callId={props.callId} failed={failed} select={select} />
   }
   function RightbarTab() { return <RunPanel selection={useSyncExternalStore(subscribe, getSelection)} select={select} /> }
-  const guideEntry = { id: 'agent-deck', order: 100, title: () => 'Agent Deck', description: () => 'Codex 子任务终端与历史输出' }
-  ctx.effect(() => ctx.sidebarRightTabs.register({ id: TAB_ID, kind: TAB_KIND, title: () => 'Agent Deck',
+  const guideEntry = { id: 'agent-deck', order: 100, title: () => 'Agent Switch', description: () => 'Codex 子任务终端与历史输出' }
+  ctx.effect(() => ctx.sidebarRightTabs.register({ id: TAB_ID, kind: TAB_KIND, title: () => 'Agent Switch',
     guide: [guideEntry],
   }), 'agent-deck: rightbar tab type')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID }, RightbarTab))
-  const panelGuide = { id: 'agent-deck-panel', order: 110, title: () => 'Agent Deck Panel', description: () => '运行时终端：启动并切换 AI CLI 终端' }
-  ctx.effect(() => ctx.sidebarRightTabs.register({ id: PANEL_ID, kind: PANEL_KIND, title: () => 'Agent Deck Panel',
+  const panelGuide = { id: 'agent-deck-panel', order: 110, title: () => 'Agent Switch Panel', description: () => '运行时终端：启动并切换 AI CLI 终端' }
+  ctx.effect(() => ctx.sidebarRightTabs.register({ id: PANEL_ID, kind: PANEL_KIND, title: () => 'Agent Switch Panel',
     guide: [panelGuide],
   }), 'agent-deck: runtime panel tab type')
   ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: PANEL_ID }, panel))
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({ name: 'tool.call.toolview', key: 'agent_deck_delegate' }, ToolCard))
-  ctx.slots.inject('settings.section', () => ctx.slots.register({ name: 'settings.section', id: 'agent-deck', order: 110, label: () => 'Agent Deck' }, SettingsPage))
+  ctx.slots.inject('settings.section', () => ctx.slots.register({ name: 'settings.section', id: 'agent-deck', order: 110, label: () => 'Agent Switch' }, SettingsPage))
 }
 
 const cardCss = `.ad-card{background:#1c1c1e;color:#e9e9eb;border-radius:16px;padding:16px;font:12px system-ui;max-width:720px}.ad-card>header{display:flex;justify-content:space-between;color:#bcbcc0}.ad-card small{color:#a9a9af}.ad-card-tree{display:grid;grid-template-columns:180px 28px minmax(0,1fr);align-items:center;margin-top:20px}.ad-card-parent{display:flex;flex-direction:column;background:#29292b;border-radius:13px;padding:16px}.ad-card-line{height:2px;background:#424246}.ad-card-children{display:grid;gap:10px;border-left:2px solid #424246;padding-left:12px}.ad-card-children button{display:flex;align-items:center;gap:10px;text-align:left;background:#28282a;border:1px solid #303034;border-radius:13px;padding:13px;color:inherit;cursor:pointer;min-height:62px}.ad-card-children button:hover{border-color:#8b9ecb}.ad-card-icon{border-radius:50%;background:#38383a;padding:8px}.ad-card-copy{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}.ad-card-copy b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ad-card-time{color:#aaa}.ad-card-loading{color:#aaa;padding:18px}@media(max-width:650px){.ad-card-tree{grid-template-columns:1fr}.ad-card-line{display:none}.ad-card-children{border:0;padding:12px 0 0}}`
